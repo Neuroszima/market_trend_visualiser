@@ -1,1 +1,1 @@
-# market_trend_predictor
+# Market trend predictor
