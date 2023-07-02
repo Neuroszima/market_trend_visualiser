@@ -17,6 +17,15 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: time_series; Type: SCHEMA; Schema: -; Owner: db_user
+--
+
+CREATE SCHEMA time_series;
+
+
+ALTER SCHEMA time_series OWNER TO db_user;
+
+--
 -- Name: adminpack; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -115,23 +124,6 @@ CREATE TABLE IF NOT EXISTS public.markets (
 ALTER TABLE public.markets OWNER TO db_user;
 
 --
--- Name: otex_time_series; Type: TABLE; Schema: public; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS public.otex_time_series (
-    "ID" integer NOT NULL,
-    datetime timestamp without time zone,
-    open numeric(10,5),
-    close numeric(10,5),
-    high numeric(10,5),
-    low numeric(10,5),
-    volume integer
-);
-
-
-ALTER TABLE public.otex_time_series OWNER TO db_user;
-
---
 -- Name: plans; Type: TABLE; Schema: public; Owner: db_user
 --
 
@@ -174,6 +166,18 @@ CREATE TABLE IF NOT EXISTS public.test_table (
 ALTER TABLE public.test_table OWNER TO db_user;
 
 --
+-- Name: test_table_2; Type: TABLE; Schema: public; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS public.test_table_2 (
+    id integer,
+    name character varying(30)
+);
+
+
+ALTER TABLE public.test_table_2 OWNER TO db_user;
+
+--
 -- Name: timezones; Type: TABLE; Schema: public; Owner: db_user
 --
 
@@ -184,6 +188,59 @@ CREATE TABLE IF NOT EXISTS public.timezones (
 
 
 ALTER TABLE public.timezones OWNER TO db_user;
+
+--
+-- Name: time_tracking_info; Type: TABLE; Schema: time_series; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS time_series.time_tracking_info (
+    "ID" integer NOT NULL,
+    stock integer NOT NULL,
+    is_tracked boolean DEFAULT false NOT NULL,
+    worker_name character varying(25) NOT NULL
+);
+
+
+ALTER TABLE time_series.time_tracking_info OWNER TO db_user;
+
+--
+-- Name: tracked_indexes; Type: VIEW; Schema: public; Owner: db_user
+--
+
+CREATE VIEW public.tracked_indexes AS
+ SELECT intermediate.name AS equity_name,
+    intermediate.symbol,
+    m.name AS market_name,
+    intermediate.is_tracked,
+    intermediate.worker_name
+   FROM (( SELECT s.name,
+            s.exchange,
+            s.symbol,
+            t_trk.is_tracked,
+            t_trk.worker_name
+           FROM (time_series.time_tracking_info t_trk
+             LEFT JOIN public.stocks s ON ((t_trk.stock = s."ID")))) intermediate
+     LEFT JOIN public.markets m ON ((intermediate.exchange = m."ID")));
+
+
+ALTER TABLE public.tracked_indexes OWNER TO db_user;
+
+--
+-- Name: OTEX_NASDAQ; Type: TABLE; Schema: time_series; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS time_series."OTEX_NASDAQ" (
+    "ID" integer NOT NULL,
+    datetime timestamp without time zone,
+    open numeric(10,5),
+    close numeric(10,5),
+    high numeric(10,5),
+    low numeric(10,5),
+    volume integer
+);
+
+
+ALTER TABLE time_series."OTEX_NASDAQ" OWNER TO db_user;
 
 --
 -- Name: markets ID; Type: CONSTRAINT; Schema: public; Owner: db_user
@@ -242,14 +299,6 @@ ALTER TABLE ONLY public.investment_types
 
 
 --
--- Name: otex_time_series otex_time_series_pkey; Type: CONSTRAINT; Schema: public; Owner: db_user
---
-
-ALTER TABLE ONLY public.otex_time_series
-    ADD CONSTRAINT otex_time_series_pkey PRIMARY KEY ("ID");
-
-
---
 -- Name: stocks stocks_pkey; Type: CONSTRAINT; Schema: public; Owner: db_user
 --
 
@@ -263,6 +312,22 @@ ALTER TABLE ONLY public.stocks
 
 ALTER TABLE ONLY public.timezones
     ADD CONSTRAINT timezones_pkey PRIMARY KEY ("ID");
+
+
+--
+-- Name: OTEX_NASDAQ otex_time_series_pkey; Type: CONSTRAINT; Schema: time_series; Owner: db_user
+--
+
+ALTER TABLE ONLY time_series."OTEX_NASDAQ"
+    ADD CONSTRAINT otex_time_series_pkey PRIMARY KEY ("ID");
+
+
+--
+-- Name: time_tracking_info time_tracking_info_pkey; Type: CONSTRAINT; Schema: time_series; Owner: db_user
+--
+
+ALTER TABLE ONLY time_series.time_tracking_info
+    ADD CONSTRAINT time_tracking_info_pkey PRIMARY KEY ("ID");
 
 
 --
@@ -351,6 +416,14 @@ ALTER TABLE ONLY public.stocks
 
 ALTER TABLE ONLY public.markets
     ADD CONSTRAINT timezone FOREIGN KEY (timezone) REFERENCES public.timezones("ID");
+
+
+--
+-- Name: time_tracking_info stock_tracked; Type: FK CONSTRAINT; Schema: time_series; Owner: db_user
+--
+
+ALTER TABLE ONLY time_series.time_tracking_info
+    ADD CONSTRAINT stock_tracked FOREIGN KEY (stock) REFERENCES public.stocks("ID");
 
 
 --
