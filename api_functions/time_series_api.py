@@ -1,5 +1,4 @@
 from time import time, sleep
-from typing import Optional
 from ast import literal_eval
 from datetime import datetime  # planned to use timedelta but not useful
 
@@ -7,20 +6,23 @@ from api_functions.miscellaneous_api import recover_get_response
 
 
 def obtain_earliest_timestamp(
-        index_symbol: str, exchange=None, interval=None, timezone=None, api_type: Optional[str] = None):
+        symbol: str, mic_code: str = None, exchange: str = None,
+        interval: str = None, timezone: str = None, api_type: str = None):
     if not interval:
         interval = "1min"
-    if not exchange:
-        exchange = "NASDAQ"
+    if not mic_code:
+        mic_code = "XNGS"
     querystring = {
         "interval": interval,
-        "exchange": exchange,
-        "symbol": index_symbol,
+        "symbol": symbol,
+        "mic_code": mic_code,
     }
 
     # following is nearly always optional
     if timezone:
         querystring['timezone'] = timezone
+    if exchange:
+        querystring['exchange'] = exchange
 
     result = recover_get_response(
         querystring,
@@ -31,23 +33,33 @@ def obtain_earliest_timestamp(
     return result
 
 
-def download_time_series(index_symbol: str, exchange=None, currency=None,
+def download_time_series(symbol: str, exchange=None, mic_code=None, currency=None,
                          start_date: datetime = None, end_date: datetime = None, date: datetime = None,
                          points=5000, data_type=None, interval=None, api_type=None):
+    """
+    recover data from API by performing a single query, passing required parameters to the POST request body
+    maximum number of data points (candles) a single query can yield is 5000
+    one can switch the usage of the api from "RapidApi" provider, or calling TwelveData API directly,
+    doubling on possible number of queries per day per email registration
+    """
+
     if api_type is None:
         api_type = "rapid"
     if not currency:
         currency = "USD"
-    if not exchange:
-        exchange = "NASDAQ"
+    if not mic_code:
+        mic_code = "XNGS"
+    # if not exchange:
+    #     exchange = "NASDAQ"
     if not interval:
         interval = "1min"
     if not data_type:
         data_type = "CSV"
     querystring = {
         "currency": currency,
-        "exchange": exchange,
-        "symbol": index_symbol,
+        # "exchange": exchange,
+        "mic_code": mic_code,
+        "symbol": symbol,
         "interval": interval,
         "format": data_type,
     }
@@ -62,6 +74,9 @@ def download_time_series(index_symbol: str, exchange=None, currency=None,
         querystring['date'] = date.strftime('%Y-%m-%d %H:%M:%S')
     if points:
         querystring['outputsize'] = points
+    # following is less precise than passing the MIC of the exchange, use with care
+    if exchange:
+        querystring['exchange'] = exchange
 
     results = recover_get_response(
         querystring=querystring,
@@ -74,9 +89,15 @@ def download_time_series(index_symbol: str, exchange=None, currency=None,
 
 
 # TODO - "verbose" edit - parameter controlling showing prints in console
-def download_full_index_history(index_symbol: str, interval=None, exchange=None, currency=None):
+def download_full_index_history(symbol: str, interval=None, mic_code=None, exchange=None, currency=None, verbose=False):
+    """
+    Automates the process of downloading entire history of the index, from the TwelveData provider
+    queries until the last datapoint/timestamp has been reached, which it checks separately in a different API query
+    """
     if not interval:
         interval = "1min"
+    if not mic_code:
+        mic_code = "XNGS"
     if not exchange:
         exchange = "NASDAQ"
     if not currency:
@@ -84,16 +105,15 @@ def download_full_index_history(index_symbol: str, interval=None, exchange=None,
 
     # decide which api to use first and start tracking api usage
     api_type = "rapid"
-    rapid_used = 0
-    regular_used = 0
+    rapid_used = False
+    regular_used = False
 
     # we need to sleep 8 seconds after this - API provider uses averaging and too many
     # requests in short time will mean "no more tries for you pal"
     # In other words - even if you do "counting per minute",
     # depleting all the tokens in first few seconds of that minute will result in an error on another read
     # if proceeded too fast, even after clocked 60 seconds pass
-    earliest_timestamp = obtain_earliest_timestamp(index_symbol, api_type=api_type)
-    # rapid_count_per_minute += 1
+    earliest_timestamp = obtain_earliest_timestamp(symbol, api_type=api_type)
     sleep(8)
 
     work_period_start = time()
@@ -101,8 +121,9 @@ def download_full_index_history(index_symbol: str, interval=None, exchange=None,
     print("target timestamp", earliest_timestamp['datetime'], work_period_start)
     first_historical_point = datetime.strptime(earliest_timestamp['datetime'], '%Y-%m-%d %H:%M:%S')
     download_params = {
-        "index_symbol": index_symbol,
+        "symbol": symbol,
         "interval": interval,
+        "mic_code": mic_code,
         "exchange": exchange,
         "currency": currency,
         # date params make it inefficient in terms of obtainable 5k data points per query
@@ -128,20 +149,22 @@ def download_full_index_history(index_symbol: str, interval=None, exchange=None,
             print(d)
             raise e
         last_record = d['values'][-1]
-        if len(full_time_series) > 0:
-            print("last record tracked:", full_time_series[-1])
-            print(f"start of the current batch: {starting_record}")
-            print("last record of current batch:", last_record)
-        else:
-            print("first batch")
-            print(f"start of the current batch: {starting_record}")
-            print("last record of current batch:", last_record)
+        if verbose:
+            if len(full_time_series) > 0:
+                print("last record tracked:", full_time_series[-1])
+                print(f"start of the current batch: {starting_record}")
+                print("last record of current batch:", last_record)
+            else:
+                print("first batch")
+                print(f"start of the current batch: {starting_record}")
+                print("last record of current batch:", last_record)
 
-        print("downloaded rows", len(d['values']))
         time_period = datetime.strptime(last_record['datetime'], '%Y-%m-%d %H:%M:%S')
-
-        print("extending with removing duplicate row (new start: ", d['values'][1:][0], ")")
         full_time_series.extend(d['values'][1:])
+
+        if verbose:
+            print("downloaded rows", len(d['values']))
+            print("extending with removing duplicate row (new start: ", d['values'][1:][0], ")")
 
         # check ending condition
         if time_period == first_historical_point:
@@ -152,25 +175,25 @@ def download_full_index_history(index_symbol: str, interval=None, exchange=None,
 
         # not finished yet? keep api usage in check to not get any errors in output
         if api_type == "rapid":
-            rapid_used += 1
+            rapid_used = True
         elif api_type == "regular":
-            regular_used += 1
+            regular_used = True
         print("api usage count:", (rapid_used, regular_used))
 
-        if rapid_used > 0:
+        if rapid_used:
             print("api type switch")
             api_type = "regular"
 
-        if rapid_used > 0 and regular_used > 0:  # TODO - light edit - switch to true/false
+        if rapid_used and regular_used:  # TODO - light edit - switch to true/false
             print("api tokens depleted, switching back to rapid and sleep")
             api_type = "rapid"
             sleep(7.4)
-            rapid_used = 0
-            regular_used = 0
+            rapid_used = False
+            regular_used = False
 
         # params refresh after recent download
         download_params = {
-            "index_symbol": index_symbol,
+            "symbol": symbol,
             "interval": interval,
             "exchange": exchange,
             "currency": currency,
@@ -189,7 +212,8 @@ def download_full_index_history(index_symbol: str, interval=None, exchange=None,
 if __name__ == '__main__':
     stock = "OTEX"
     # following is ~250k rows download
-    time_series = download_full_index_history(index_symbol=stock)
-    with open('../db_functions/otex_series.txt', 'w', encoding="UTF-8", newline='\n') as api_test:
+    time_series = download_full_index_history(symbol=stock)
+    with open('../db_functions/otex_series_OG.txt', 'w', encoding="UTF-8", newline='\n') as api_test:
         for entry in time_series:
+            print(type(entry))
             api_test.write(str(entry) + "\n")
