@@ -17,13 +17,22 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: time_series; Type: SCHEMA; Schema: -; Owner: db_user
+-- Name: 1day_time_series; Type: SCHEMA; Schema: -; Owner: db_user
 --
 
-CREATE SCHEMA time_series;
+CREATE SCHEMA "1day_time_series";
 
 
-ALTER SCHEMA time_series OWNER TO db_user;
+ALTER SCHEMA "1day_time_series" OWNER TO db_user;
+
+--
+-- Name: 1min_time_series; Type: SCHEMA; Schema: -; Owner: db_user
+--
+
+CREATE SCHEMA "1min_time_series";
+
+
+ALTER SCHEMA "1min_time_series" OWNER TO db_user;
 
 --
 -- Name: adminpack; Type: EXTENSION; Schema: -; Owner: -
@@ -33,7 +42,7 @@ CREATE EXTENSION IF NOT EXISTS adminpack WITH SCHEMA pg_catalog;
 
 
 --
--- Name: EXTENSION adminpack; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION adminpack; Type: COMMENT; Schema: -; Owner:
 --
 
 COMMENT ON EXTENSION adminpack IS 'administrative functions for PostgreSQL';
@@ -42,6 +51,91 @@ COMMENT ON EXTENSION adminpack IS 'administrative functions for PostgreSQL';
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: TEST_SERI; Type: TABLE; Schema: 1day_time_series; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS "1day_time_series"."TEST_SERI" (
+    "ID" integer NOT NULL,
+    datetime timestamp without time zone,
+    open numeric(10,5),
+    close numeric(10,5),
+    high numeric(10,5),
+    low numeric(10,5),
+    volume integer
+);
+
+
+ALTER TABLE "1day_time_series"."TEST_SERI" OWNER TO db_user;
+
+--
+-- Name: AAPL_XNGS; Type: TABLE; Schema: 1min_time_series; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS "1min_time_series"."AAPL_XNGS" (
+    "ID" integer NOT NULL,
+    datetime timestamp without time zone,
+    open numeric(10,5),
+    close numeric(10,5),
+    high numeric(10,5),
+    low numeric(10,5),
+    volume integer
+);
+
+
+ALTER TABLE "1min_time_series"."AAPL_XNGS" OWNER TO db_user;
+
+--
+-- Name: NVDA_XNGS; Type: TABLE; Schema: 1min_time_series; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS "1min_time_series"."NVDA_XNGS" (
+    "ID" integer NOT NULL,
+    datetime timestamp without time zone,
+    open numeric(10,5),
+    close numeric(10,5),
+    high numeric(10,5),
+    low numeric(10,5),
+    volume integer
+);
+
+
+ALTER TABLE "1min_time_series"."NVDA_XNGS" OWNER TO db_user;
+
+--
+-- Name: OTEX_XNGS; Type: TABLE; Schema: 1min_time_series; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS "1min_time_series"."OTEX_XNGS" (
+    "ID" integer NOT NULL,
+    datetime timestamp without time zone,
+    open numeric(10,5),
+    close numeric(10,5),
+    high numeric(10,5),
+    low numeric(10,5),
+    volume integer
+);
+
+
+ALTER TABLE "1min_time_series"."OTEX_XNGS" OWNER TO db_user;
+
+--
+-- Name: TEST_SERI; Type: TABLE; Schema: 1min_time_series; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS "1min_time_series"."TEST_SERI" (
+    "ID" integer NOT NULL,
+    datetime timestamp without time zone,
+    open numeric(10,5),
+    close numeric(10,5),
+    high numeric(10,5),
+    low numeric(10,5),
+    volume integer
+);
+
+
+ALTER TABLE "1min_time_series"."TEST_SERI" OWNER TO db_user;
 
 --
 -- Name: countries; Type: TABLE; Schema: public; Owner: db_user
@@ -178,6 +272,21 @@ CREATE TABLE IF NOT EXISTS public.test_table_2 (
 ALTER TABLE public.test_table_2 OWNER TO db_user;
 
 --
+-- Name: time_tracking_info; Type: TABLE; Schema: public; Owner: db_user
+--
+
+CREATE TABLE IF NOT EXISTS public.time_tracking_info (
+    "ID" integer NOT NULL,
+    is_tracked_1min boolean DEFAULT false NOT NULL,
+    is_tracked_1day boolean DEFAULT false NOT NULL,
+    stock integer NOT NULL,
+    worker_name character varying(35) NOT NULL
+);
+
+
+ALTER TABLE public.time_tracking_info OWNER TO db_user;
+
+--
 -- Name: timezones; Type: TABLE; Schema: public; Owner: db_user
 --
 
@@ -190,20 +299,6 @@ CREATE TABLE IF NOT EXISTS public.timezones (
 ALTER TABLE public.timezones OWNER TO db_user;
 
 --
--- Name: time_tracking_info; Type: TABLE; Schema: time_series; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS time_series.time_tracking_info (
-    "ID" integer NOT NULL,
-    stock integer NOT NULL,
-    is_tracked boolean DEFAULT false NOT NULL,
-    worker_name character varying(25) NOT NULL
-);
-
-
-ALTER TABLE time_series.time_tracking_info OWNER TO db_user;
-
---
 -- Name: tracked_indexes; Type: VIEW; Schema: public; Owner: db_user
 --
 
@@ -211,14 +306,16 @@ CREATE VIEW public.tracked_indexes AS
  SELECT intermediate.name AS equity_name,
     intermediate.symbol,
     m.name AS market_name,
-    intermediate.is_tracked,
+    intermediate.is_tracked_1day,
+    intermediate.is_tracked_1min,
     intermediate.worker_name
    FROM (( SELECT s.name,
             s.exchange,
             s.symbol,
-            t_trk.is_tracked,
+            t_trk.is_tracked_1min,
+            t_trk.is_tracked_1day,
             t_trk.worker_name
-           FROM (time_series.time_tracking_info t_trk
+           FROM (public.time_tracking_info t_trk
              LEFT JOIN public.stocks s ON ((t_trk.stock = s."ID")))) intermediate
      LEFT JOIN public.markets m ON ((intermediate.exchange = m."ID")));
 
@@ -226,21 +323,44 @@ CREATE VIEW public.tracked_indexes AS
 ALTER TABLE public.tracked_indexes OWNER TO db_user;
 
 --
--- Name: OTEX_NASDAQ; Type: TABLE; Schema: time_series; Owner: db_user
+-- Name: TEST_SERI test_time_series_pkey; Type: CONSTRAINT; Schema: 1day_time_series; Owner: db_user
 --
 
-CREATE TABLE IF NOT EXISTS time_series."OTEX_NASDAQ" (
-    "ID" integer NOT NULL,
-    datetime timestamp without time zone,
-    open numeric(10,5),
-    close numeric(10,5),
-    high numeric(10,5),
-    low numeric(10,5),
-    volume integer
-);
+ALTER TABLE ONLY "1day_time_series"."TEST_SERI"
+    ADD CONSTRAINT test_time_series_pkey PRIMARY KEY ("ID");
 
 
-ALTER TABLE time_series."OTEX_NASDAQ" OWNER TO db_user;
+--
+-- Name: AAPL_XNGS aapl_time_series_key; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
+--
+
+ALTER TABLE ONLY "1min_time_series"."AAPL_XNGS"
+    ADD CONSTRAINT aapl_time_series_key PRIMARY KEY ("ID");
+
+
+--
+-- Name: NVDA_XNGS nvda_time_series_pkey; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
+--
+
+ALTER TABLE ONLY "1min_time_series"."NVDA_XNGS"
+    ADD CONSTRAINT nvda_time_series_pkey PRIMARY KEY ("ID");
+
+
+--
+-- Name: OTEX_XNGS otex_time_series_pkey; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
+--
+
+ALTER TABLE ONLY "1min_time_series"."OTEX_XNGS"
+    ADD CONSTRAINT otex_time_series_pkey PRIMARY KEY ("ID");
+
+
+--
+-- Name: TEST_SERI test_time_series_pkey; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
+--
+
+ALTER TABLE ONLY "1min_time_series"."TEST_SERI"
+    ADD CONSTRAINT test_time_series_pkey PRIMARY KEY ("ID");
+
 
 --
 -- Name: markets ID; Type: CONSTRAINT; Schema: public; Owner: db_user
@@ -307,27 +427,19 @@ ALTER TABLE ONLY public.stocks
 
 
 --
+-- Name: time_tracking_info time_tracking_pkey; Type: CONSTRAINT; Schema: public; Owner: db_user
+--
+
+ALTER TABLE ONLY public.time_tracking_info
+    ADD CONSTRAINT time_tracking_pkey PRIMARY KEY ("ID");
+
+
+--
 -- Name: timezones timezones_pkey; Type: CONSTRAINT; Schema: public; Owner: db_user
 --
 
 ALTER TABLE ONLY public.timezones
     ADD CONSTRAINT timezones_pkey PRIMARY KEY ("ID");
-
-
---
--- Name: OTEX_NASDAQ otex_time_series_pkey; Type: CONSTRAINT; Schema: time_series; Owner: db_user
---
-
-ALTER TABLE ONLY time_series."OTEX_NASDAQ"
-    ADD CONSTRAINT otex_time_series_pkey PRIMARY KEY ("ID");
-
-
---
--- Name: time_tracking_info time_tracking_info_pkey; Type: CONSTRAINT; Schema: time_series; Owner: db_user
---
-
-ALTER TABLE ONLY time_series.time_tracking_info
-    ADD CONSTRAINT time_tracking_info_pkey PRIMARY KEY ("ID");
 
 
 --
@@ -411,19 +523,19 @@ ALTER TABLE ONLY public.stocks
 
 
 --
+-- Name: time_tracking_info stock_id; Type: FK CONSTRAINT; Schema: public; Owner: db_user
+--
+
+ALTER TABLE ONLY public.time_tracking_info
+    ADD CONSTRAINT stock_id FOREIGN KEY (stock) REFERENCES public.stocks("ID");
+
+
+--
 -- Name: markets timezone; Type: FK CONSTRAINT; Schema: public; Owner: db_user
 --
 
 ALTER TABLE ONLY public.markets
     ADD CONSTRAINT timezone FOREIGN KEY (timezone) REFERENCES public.timezones("ID");
-
-
---
--- Name: time_tracking_info stock_tracked; Type: FK CONSTRAINT; Schema: time_series; Owner: db_user
---
-
-ALTER TABLE ONLY time_series.time_tracking_info
-    ADD CONSTRAINT stock_tracked FOREIGN KEY (stock) REFERENCES public.stocks("ID");
 
 
 --

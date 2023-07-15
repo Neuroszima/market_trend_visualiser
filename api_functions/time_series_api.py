@@ -88,7 +88,6 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
     return results
 
 
-# TODO - "verbose" edit - parameter controlling showing prints in console
 def download_full_index_history(symbol: str, interval=None, mic_code=None, exchange=None, currency=None, verbose=False):
     """
     Automates the process of downloading entire history of the index, from the TwelveData provider
@@ -184,7 +183,7 @@ def download_full_index_history(symbol: str, interval=None, mic_code=None, excha
             print("api type switch")
             api_type = "regular"
 
-        if rapid_used and regular_used:  # TODO - light edit - switch to true/false
+        if rapid_used and regular_used:
             print("api tokens depleted, switching back to rapid and sleep")
             api_type = "rapid"
             sleep(7.4)
@@ -217,3 +216,4 @@ if __name__ == '__main__':
         for entry in time_series:
             print(type(entry))
             api_test.write(str(entry) + "\n")
+    # print(obtain_earliest_timestamp("OTEX", mic_code="XNGS", interval='1day'))
