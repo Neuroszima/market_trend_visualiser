@@ -5,7 +5,7 @@ from db_functions import db_helpers
 
 # queries
 create_time_table = """
-create table {time_interval}_time_series."{symbol}_{market_identification_code}" (
+create table "{time_interval}_time_series"."{symbol}_{market_identification_code}" (
     "ID" integer not null,
     datetime timestamp without time zone,
     open numeric(10,5),

@@ -7,13 +7,13 @@ from api_functions.miscellaneous_api import recover_get_response
 
 def obtain_earliest_timestamp(
         symbol: str, mic_code: str = None, exchange: str = None,
-        interval: str = None, timezone: str = None, api_type: str = None):
-    if not interval:
-        interval = "1min"
+        time_interval: str = None, timezone: str = None, api_type: str = None):
+    if not time_interval:
+        time_interval = "1min"
     if not mic_code:
         mic_code = "XNGS"
     querystring = {
-        "interval": interval,
+        "interval": time_interval,
         "symbol": symbol,
         "mic_code": mic_code,
     }
@@ -35,7 +35,7 @@ def obtain_earliest_timestamp(
 
 def download_time_series(symbol: str, exchange=None, mic_code=None, currency=None,
                          start_date: datetime = None, end_date: datetime = None, date: datetime = None,
-                         points=5000, data_type=None, interval=None, api_type=None):
+                         points=5000, data_type=None, time_interval=None, api_type=None):
     """
     recover data from API by performing a single query, passing required parameters to the POST request body
     maximum number of data points (candles) a single query can yield is 5000
@@ -51,8 +51,8 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
         mic_code = "XNGS"
     # if not exchange:
     #     exchange = "NASDAQ"
-    if not interval:
-        interval = "1min"
+    if not time_interval:
+        time_interval = "1min"
     if not data_type:
         data_type = "CSV"
     querystring = {
@@ -60,7 +60,7 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
         # "exchange": exchange,
         "mic_code": mic_code,
         "symbol": symbol,
-        "interval": interval,
+        "interval": time_interval,
         "format": data_type,
     }
 
@@ -88,13 +88,15 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
     return results
 
 
-def download_full_index_history(symbol: str, interval=None, mic_code=None, exchange=None, currency=None, verbose=False):
+def download_full_index_history(
+        symbol: str, time_interval=None, mic_code=None, exchange=None, currency=None, verbose=False):
     """
     Automates the process of downloading entire history of the index, from the TwelveData provider
     queries until the last datapoint/timestamp has been reached, which it checks separately in a different API query
     """
-    if not interval:
-        interval = "1min"
+    print(f"{time_interval=}")
+    if not time_interval:
+        time_interval = "1min"
     if not mic_code:
         mic_code = "XNGS"
     if not exchange:
@@ -112,24 +114,28 @@ def download_full_index_history(symbol: str, interval=None, mic_code=None, excha
     # In other words - even if you do "counting per minute",
     # depleting all the tokens in first few seconds of that minute will result in an error on another read
     # if proceeded too fast, even after clocked 60 seconds pass
-    earliest_timestamp = obtain_earliest_timestamp(symbol, api_type=api_type)
+    earliest_timestamp = obtain_earliest_timestamp(symbol, api_type=api_type, time_interval=time_interval)
     sleep(8)
 
     work_period_start = time()
     full_time_series = []
     print("target timestamp", earliest_timestamp['datetime'], work_period_start)
-    first_historical_point = datetime.strptime(earliest_timestamp['datetime'], '%Y-%m-%d %H:%M:%S')
+
+    if time_interval == "1min":
+        first_historical_point = datetime.strptime(earliest_timestamp['datetime'], '%Y-%m-%d %H:%M:%S')
+    elif time_interval == "1day":
+        first_historical_point = datetime.strptime(earliest_timestamp['datetime'], '%Y-%m-%d')
+    else:
+        raise ValueError("Improper argument for this API query. Possible intervals for this app: ('1min', '1day')")
+
     download_params = {
         "symbol": symbol,
-        "interval": interval,
+        "time_interval": time_interval,
         "mic_code": mic_code,
         "exchange": exchange,
         "currency": currency,
         # date params make it inefficient in terms of obtainable 5k data points per query
         "end_date": None,
-        # "end_date": time_period+timedelta(days=20),
-        # "start_date": time_period,
-        # "date": time_period,
         "data_type": "json",
     }
 
@@ -158,7 +164,10 @@ def download_full_index_history(symbol: str, interval=None, mic_code=None, excha
                 print(f"start of the current batch: {starting_record}")
                 print("last record of current batch:", last_record)
 
-        time_period = datetime.strptime(last_record['datetime'], '%Y-%m-%d %H:%M:%S')
+        if time_interval == "1min":
+            time_period = datetime.strptime(last_record['datetime'], '%Y-%m-%d %H:%M:%S')
+        elif time_interval == "1day":
+            time_period = datetime.strptime(last_record['datetime'], '%Y-%m-%d')
         full_time_series.extend(d['values'][1:])
 
         if verbose:
@@ -193,7 +202,7 @@ def download_full_index_history(symbol: str, interval=None, mic_code=None, excha
         # params refresh after recent download
         download_params = {
             "symbol": symbol,
-            "interval": interval,
+            "time_interval": time_interval,
             "exchange": exchange,
             "currency": currency,
             "end_date": time_period,

@@ -9,7 +9,7 @@ query_create_table_for_index = """
 """
 # insert queries
 query_insert_index_data = """
-INSERT INTO time_series.\"{equity_symbol}_{market_identification_code}\" 
+INSERT INTO {time_series_schema}.\"{equity_symbol}_{market_identification_code}\" 
 (\"ID\", datetime, open, close, high, low, volume) 
 VALUES (
     {index},
@@ -23,7 +23,7 @@ VALUES (
 """
 
 
-def insert_index_historical_data(historical_data: list[dict], equity_symbol: str, mic_code: str):
+def insert_index_historical_data(historical_data: list[dict], equity_symbol: str, mic_code: str, time_interval: str):
     with psycopg2.connect(**connection_dict) as conn:
         cur = conn.cursor()
         #  iterate from oldest to newest - new rows will be appended to the farthest row anyway
@@ -31,6 +31,7 @@ def insert_index_historical_data(historical_data: list[dict], equity_symbol: str
             query_dict = {
                 "index": rownum,
                 "equity_symbol": equity_symbol,
+                "time_series_schema": f'"{time_interval}_time_series"',
                 "market_identification_code": mic_code,
                 "timestamp": f"'{candle['datetime']}'",
                 "open_price": candle['open'],
@@ -52,4 +53,4 @@ if __name__ == '__main__':
             data.append(data_point)
     # print(data[0], type(data_point), type(data[0]))
 
-    insert_index_historical_data(data, equity_symbol='OTEX', mic_code="XNGS")
+    insert_index_historical_data(data, equity_symbol='OTEX', mic_code="XNGS", time_interval="1min")
