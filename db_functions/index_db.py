@@ -23,7 +23,7 @@ VALUES (
 """
 
 
-def insert_index_historical_data(historical_data: list[dict], equity_symbol: str, mic_code: str, time_interval: str):
+def insert_equity_historical_data(historical_data: list[dict], equity_symbol: str, mic_code: str, time_interval: str):
     with psycopg2.connect(**connection_dict) as conn:
         cur = conn.cursor()
         #  iterate from oldest to newest - new rows will be appended to the farthest row anyway
@@ -53,4 +53,4 @@ if __name__ == '__main__':
             data.append(data_point)
     # print(data[0], type(data_point), type(data[0]))
 
-    insert_index_historical_data(data, equity_symbol='OTEX', mic_code="XNGS", time_interval="1min")
+    insert_equity_historical_data(data, equity_symbol='OTEX', mic_code="XNGS", time_interval="1min")
