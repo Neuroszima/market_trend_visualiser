@@ -88,7 +88,7 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
     return results
 
 
-def download_full_index_history(
+def download_full_equity_history(
         symbol: str, time_interval=None, mic_code=None, exchange=None, currency=None, verbose=False):
     """
     Automates the process of downloading entire history of the index, from the TwelveData provider
@@ -220,9 +220,9 @@ def download_full_index_history(
 if __name__ == '__main__':
     stock = "OTEX"
     # following is ~250k rows download
-    time_series = download_full_index_history(symbol=stock)
-    with open('../db_functions/otex_series_OG.txt', 'w', encoding="UTF-8", newline='\n') as api_test:
-        for entry in time_series:
-            print(type(entry))
-            api_test.write(str(entry) + "\n")
-    # print(obtain_earliest_timestamp("OTEX", mic_code="XNGS", interval='1day'))
+    # time_series = download_full_equity_history(symbol=stock)
+    # with open('../db_functions/otex_series_OG.txt', 'w', encoding="UTF-8", newline='\n') as api_test:
+    #     for entry in time_series:
+    #         print(type(entry))
+    #         api_test.write(str(entry) + "\n")
+    print(obtain_earliest_timestamp("OTEX", mic_code="XNGS", time_interval='1day'))

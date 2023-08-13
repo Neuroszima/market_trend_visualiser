@@ -1,9 +1,6 @@
 from ast import literal_eval
 
-from api_functions.API_URLS import (
-    GLOBAL_API_URL, RAPIDAPI_GLOBAL_API_URL,
-    TIME_SERIES_URL, EARLIEST_TIMESTAMP_URL, API_USAGE_URL
-)
+from api_functions.API_URLS import *
 
 from settings import headers, regular_api_key
 import requests
@@ -28,8 +25,13 @@ def recover_get_response(querystring: dict, request_type=None, data_type=None, a
             endpoint = EARLIEST_TIMESTAMP_URL
         case "time_series":
             endpoint = TIME_SERIES_URL
+        case "indices":
+            endpoint = INDICES_URL
         case _:
-            endpoint = API_USAGE_URL
+            if api_type == "regular":
+                endpoint = API_USAGE_URL
+            else:
+                raise ValueError(f"request type value is invalid: {request_type}")
 
     match api_type:
         case "rapid":
@@ -41,6 +43,7 @@ def recover_get_response(querystring: dict, request_type=None, data_type=None, a
             raise KeyError("no api provided to connect to")
 
     get_request['url'] = api + endpoint
+    print(get_request)
     response = requests.get(**get_request)
     match data_type:
         case "json":
@@ -59,4 +62,14 @@ def get_api_usage():
 
 
 if __name__ == '__main__':
-    get_api_usage()
+    # print(get_api_usage())
+    querystring = {
+        "exchange": "XNGS",
+        "currency": "USD",
+    }
+    print(recover_get_response(
+        querystring=querystring,
+        api_type="rapid",
+        request_type="indices",
+        data_type='json'
+    ))

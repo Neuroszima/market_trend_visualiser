@@ -14,6 +14,7 @@ TIME_SERIES_URL = "/time_series"
 EXCHANGE_RATE_URL = "/exchange_rate"
 API_USAGE_URL = "/api_usage"
 EARLIEST_TIMESTAMP_URL = "/earliest_timestamp"
+INDICES_URL = "/indices"
 
 # analysis factors
 RSI_INDICATOR = "/rsi"
