@@ -6,17 +6,18 @@ from matplotlib.figure import Figure
 
 # hard params
 verbose = False
-simulation_number = 90
+simulation_number = 3000
 trades = 3000
-c = 0.40
-reward_factor = 1.8
+c = 0.42
+reward_factor = 2
 results_pool = []
-start_operating_balance = 300
+start_operating_balance = 800
+comissions = 1.74
 
 # soft params - need to start first
 operating_balance = start_operating_balance
 secondary_balance = 0
-bet = 10
+bet = 8
 luck_in_row = 0
 balance_history = [start_operating_balance]
 
@@ -49,16 +50,12 @@ for strategy_case in range(simulation_number):
         else:
             operating_balance -= bet
 
-        # if bet > 100:
-        #     print("target hit")
-        #     secondary_balance += operating_balance - 50
-        #     operating_balance = 50
-        #     bet = 10
+        # commissions
+        operating_balance -= comissions
+
         balance_history.append(operating_balance)
-        # secondary_balance_history.append(secondary_balance)
 
     minimal_balance_state = min(balance_history)
-    # end_profit = secondary_balance_history[-1]
     end_balance = balance_history[-1]
 
     # draw-down dependent variables
@@ -74,8 +71,8 @@ for strategy_case in range(simulation_number):
         profitable_with_600_start,
         profitable_with_1000_start,
     ))
-    axes.plot([i + 1 for i in range(trades)], balance_history)
 
+axes.plot([i + 1 for i in range(trades)], balance_history)
 
 # strategy points of interest view
 minimum_drawdown = min([sim[2] for sim in results_pool])
@@ -107,12 +104,7 @@ profitability probablity: {sum([int(sim[1]) for sim in results_pool])/simulation
 minimum drawdown: {minimum_drawdown}
 strategy expectancy ($ end profit): {strategy_expected_profit}
 strategy expectancy (x interest rate): {interest_rate}
-
 """
-
-# maximum observed withdrawl end amount: {max([sim[3] for sim in results_pool])}
-# chance of being profitable with $600 start: {sum([sim[4] for sim in results_pool])/simulation_number}
-# chance of being profitable with $1000 start: {sum([sim[5] for sim in results_pool])/simulation_number}
 
 print(text_analisys)
 
