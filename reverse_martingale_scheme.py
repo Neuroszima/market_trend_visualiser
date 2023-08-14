@@ -7,19 +7,20 @@ from matplotlib.figure import Figure
 # hard parameters
 verbose = False
 drawdown_management = True
-simulation_number = 90
+simulation_number = 3000
 trades = 3000
-c = 0.40
-reward_factor = 1.8
+c = 0.42
+reward_factor = 2.3
 results_pool = []
 luck_parameter = 3
-start_operating_balance = 300
+start_operating_balance = 800
+comissions = 1.74
 
 
 # soft params - need to start first
 operating_balance = start_operating_balance
 secondary_balance = 0
-bet = 10
+base_bet = 8
 luck_in_row = 0
 balance_history = [start_operating_balance]
 secondary_balance_history = [0]
@@ -35,36 +36,42 @@ for strategy_case in range(simulation_number):
     operating_balance = start_operating_balance
     secondary_balance = 0
     luck_in_row = 0
-    bet = 10
+    stake = 1
+    # bet = 10
 
     if not (strategy_case % 50):
         print(strategy_case, ' processing')
 
     for i in range(trades-1):
-        toss = random() < c
         if verbose:
             print(f"prediction {toss}")
             print(f"{operating_balance=}")
-            print(f"{bet=}")
+            print(f"risk={stake*base_bet}")
             print(f"{secondary_balance=}")
+
+        toss = random() < c
+        # comissions
+        operating_balance -= comissions * stake
 
         # trade results and success counting
         if toss:
-            operating_balance += bet * reward_factor
-            bet *= 2
+            operating_balance += stake * base_bet * reward_factor
+            stake += 1
             luck_in_row += 1
+
         else:
-            operating_balance -= bet
-            bet = 10
+            operating_balance -= stake * base_bet
+            stake = 1
             luck_in_row = 0
 
         # money management strategy
         if luck_in_row > luck_parameter:
+            stake = 1
             # if operating_balance > start_operating_balance:
             #     transfer = (operating_balance-start_operating_balance)*0.2
             #     operating_balance -= transfer
             #     secondary_balance += transfer
-            bet = 10
+
 
         # feedback loop of balance management
         # if drawdown_management and secondary_balance > 0:
@@ -94,7 +101,7 @@ for strategy_case in range(simulation_number):
         profitable_with_1000_start,
     ))
 
-    axes.plot([i + 1 for i in range(trades)], balance_history)
+axes.plot([i + 1 for i in range(trades)], balance_history)
 
 # worst scenario view
 minimum_drawdown = min([sim[2] for sim in results_pool])
@@ -117,6 +124,8 @@ number of simulation retries = {simulation_number}
 trades per "simulation" = {trades}
 chance of single success = {round(c, 2)}
 reward factor = {reward_factor}
+starting balance = {start_operating_balance}
+luck factor = {luck_parameter}
 
 results:
 example: {results_pool[0]}
