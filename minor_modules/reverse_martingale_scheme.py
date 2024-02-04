@@ -30,7 +30,7 @@ fig: Figure
 axes: Axes
 _, axes = plt.subplots()
 
-for strategy_case in range(simulation_number):
+for investment_step in range(simulation_number):
     balance_history = [start_operating_balance]
     secondary_balance_history = [0]
     operating_balance = start_operating_balance
@@ -39,17 +39,17 @@ for strategy_case in range(simulation_number):
     stake = 1
     # bet = 10
 
-    if not (strategy_case % 50):
-        print(strategy_case, ' processing')
+    if not (investment_step % 50):
+        print(investment_step, ' processing...')
 
     for i in range(trades-1):
+        toss = random() < c
         if verbose:
             print(f"prediction {toss}")
             print(f"{operating_balance=}")
             print(f"risk={stake*base_bet}")
             print(f"{secondary_balance=}")
 
-        toss = random() < c
         # comissions
         operating_balance -= comissions * stake
 
@@ -93,7 +93,7 @@ for strategy_case in range(simulation_number):
     profitable_with_600_start = minimal_balance_state > -550
     profitable_with_1000_start = minimal_balance_state > -950
     results_pool.append((
-        strategy_case,
+        investment_step,
         can_make_money,
         minimal_balance_state,
         end_profit,
