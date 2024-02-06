@@ -54,15 +54,24 @@ idea on how such investing system works.
 ### Application goals
 
 :heavy_check_mark: handle downloading data through both endpoints (Rapid-API and direct TwelveData)
+
 :heavy_check_mark: solve the problem of errors happening when data is downloaded too fast.
+
 :heavy_check_mark: prepare a function to automatically download full timeseries from the earliest possible timestamp available
+
 :heavy_check_mark: prepare a procedure to fill the database with miscellaneous data from data provider (like: timezones, 
 subscription plans, stock markets symbols, currency pair symbols, company symbols (per stock market), and other...)
-- [ ] track how many tokens have been used so far in a day
-- [ ] prepare a visual tool (very basic, for example in T-kinter) to mark which tickers have to be kept track of 
+
+:white_check_mark: track how many tokens have been used so far in a day
+
+:white_check_mark: prepare a visual tool (very basic, for example in T-kinter) to mark which tickers have to be kept track of 
 automatically when running script
-- [ ] automate downloading stock data of certain stock market tickers, when running script on windows computer (for 
+
+:white_check_mark: automate downloading stock data of certain stock market tickers, when running script on windows computer (for 
 example a cript that could be ran through windows/linux scheduler)
-- [ ] prepare simple data visualizer for already downloaded timeseries (limited one - latest 90 days or latest 90 minutes)
-- [ ] prepare automatic creation script for creating a fresh database
-- [ ] 1 minute timeseries download limits need to be future-proof all the way down the 2020 year
+
+:white_check_mark: prepare simple data visualizer for already downloaded timeseries (limited one - latest 90 days or latest 90 minutes)
+
+:white_check_mark: prepare automatic creation script for creating a fresh database
+
+:white_check_mark: 1 minute timeseries download limits need to be future-proof all the way down the 2020 year
