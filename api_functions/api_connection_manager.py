@@ -7,8 +7,13 @@ class DownloadableItem:
     item_returned_structure: dict
 
 
-
 class APIWorker:
+    """
+    this class aims at automation of data downloading and counting API tokens that are being used per-key
+
+
+    """
+
     def __init__(self, name: str, rapid_api_key: str, regular_api_key: str):
         self.download_item = None
         self.worker_name = name

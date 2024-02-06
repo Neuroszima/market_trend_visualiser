@@ -1,7 +1,9 @@
 from ast import literal_eval
-import psycopg2
-from db_functions.db_helpers import connection_dict, db_string_converter
 
+import psycopg2
+
+from db_functions.db_helpers import connection_dict, db_string_converter
+from minor_modules.helpers import time_interval_sanitizer
 
 # create queries
 query_create_table_for_index = """
@@ -23,6 +25,7 @@ VALUES (
 """
 
 
+@time_interval_sanitizer()
 def insert_equity_historical_data(historical_data: list[dict], equity_symbol: str, mic_code: str, time_interval: str):
     with psycopg2.connect(**connection_dict) as conn:
         cur = conn.cursor()

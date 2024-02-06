@@ -15,6 +15,7 @@ stocks = {
         'plan': str
     }
 }
+
 # this contains dict in dict
 exchanges = {
     'access': {
@@ -26,15 +27,19 @@ exchanges = {
     'name': str,
     'timezone': str
 }
+
 etfs = {
 
 }
+
 cryptocurrencies = {
 
 }
+
 forex_pairs = {
 
 }
+
 # following contain proper read rules to be used in "strptime"
 time_series_1min = {
     'datetime': (datetime, "%Y-%m-%d %H:%M:%S"),
@@ -44,6 +49,7 @@ time_series_1min = {
     'close': float,
     'volume': int
 }
+
 time_series_1day = {
     'datetime': (datetime, "%Y-%m-%d"),
     'high': float,
@@ -52,6 +58,7 @@ time_series_1day = {
     'close': float,
     'volume': int
 }
+
 api_usage = {
     'timestamp': (datetime, "%Y-%m-%d %H:%M:%S"),
     'current_usage': int,
@@ -59,10 +66,12 @@ api_usage = {
     'daily_usage': int,
     'plan_daily_limit': int,
 }
+
 earliest_timestamp_1day = {
     'datetime': (datetime, "%Y-%m-%d"),
     'unix_time': int
 }
+
 exchange_rate = {
 
 }

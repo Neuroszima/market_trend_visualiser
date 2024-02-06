@@ -53,23 +53,6 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: TEST_SERI; Type: TABLE; Schema: 1day_time_series; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS "1day_time_series"."TEST_SERI" (
-    "ID" integer NOT NULL,
-    datetime timestamp without time zone,
-    open numeric(10,5),
-    close numeric(10,5),
-    high numeric(10,5),
-    low numeric(10,5),
-    volume integer
-);
-
-
-ALTER TABLE "1day_time_series"."TEST_SERI" OWNER TO db_user;
-
---
 -- Name: AAPL_XNGS; Type: TABLE; Schema: 1min_time_series; Owner: db_user
 --
 
@@ -120,22 +103,6 @@ CREATE TABLE IF NOT EXISTS "1min_time_series"."OTEX_XNGS" (
 
 ALTER TABLE "1min_time_series"."OTEX_XNGS" OWNER TO db_user;
 
---
--- Name: TEST_SERI; Type: TABLE; Schema: 1min_time_series; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS "1min_time_series"."TEST_SERI" (
-    "ID" integer NOT NULL,
-    datetime timestamp without time zone,
-    open numeric(10,5),
-    close numeric(10,5),
-    high numeric(10,5),
-    low numeric(10,5),
-    volume integer
-);
-
-
-ALTER TABLE "1min_time_series"."TEST_SERI" OWNER TO db_user;
 
 --
 -- Name: countries; Type: TABLE; Schema: public; Owner: db_user
@@ -249,29 +216,6 @@ CREATE TABLE IF NOT EXISTS public.stocks (
 ALTER TABLE public.stocks OWNER TO db_user;
 
 --
--- Name: test_table; Type: TABLE; Schema: public; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS public.test_table (
-    string_val character varying(130)
-);
-
-
-ALTER TABLE public.test_table OWNER TO db_user;
-
---
--- Name: test_table_2; Type: TABLE; Schema: public; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS public.test_table_2 (
-    id integer,
-    name character varying(30)
-);
-
-
-ALTER TABLE public.test_table_2 OWNER TO db_user;
-
---
 -- Name: time_tracking_info; Type: TABLE; Schema: public; Owner: db_user
 --
 
@@ -322,12 +266,6 @@ CREATE VIEW public.tracked_indexes AS
 
 ALTER TABLE public.tracked_indexes OWNER TO db_user;
 
---
--- Name: TEST_SERI test_time_series_pkey; Type: CONSTRAINT; Schema: 1day_time_series; Owner: db_user
---
-
-ALTER TABLE ONLY "1day_time_series"."TEST_SERI"
-    ADD CONSTRAINT test_time_series_pkey PRIMARY KEY ("ID");
 
 
 --
@@ -353,13 +291,6 @@ ALTER TABLE ONLY "1min_time_series"."NVDA_XNGS"
 ALTER TABLE ONLY "1min_time_series"."OTEX_XNGS"
     ADD CONSTRAINT otex_time_series_pkey PRIMARY KEY ("ID");
 
-
---
--- Name: TEST_SERI test_time_series_pkey; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
---
-
-ALTER TABLE ONLY "1min_time_series"."TEST_SERI"
-    ADD CONSTRAINT test_time_series_pkey PRIMARY KEY ("ID");
 
 
 --

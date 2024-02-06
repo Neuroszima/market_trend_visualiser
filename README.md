@@ -4,10 +4,9 @@ This project aims to download stock market data from certain provider and archiv
 used freely for some other purpose. These purposes might include following:
 
 - [ ] Visualising the data in any form in matplotlib chart package - for example as a series of price changes 
-(called price action) in time. This price change could be visualised as for example series of "market close"
+(called price action) in time. This price change could be visualised as, for example, series of "market close"
 prices, or for example as a japanese candlestick chart.
-- [ ] visualisations can be carried on web explorer directly, serving the data for the browser
-  (in the similar fashion to the one used by TradingView.com)
+- [ ] visualisations can be carried on web browser directly (in the similar fashion to the one used by TradingView.com)
 - [ ] Data can be used to gather statistics about different time periods
 - [ ] Finally, application could be used to serve as offline/online-based machine learning data feed
 
@@ -74,4 +73,4 @@ example a cript that could be ran through windows/linux scheduler)
 
 :heavy_minus_sign: prepare automatic creation script for creating a fresh database
 
-:heavy_minus_sign: 1 minute timeseries download limits need to be future-proof all the way down the 2020 year
+:heavy_minus_sign: 1 minute timeseries download limits need to be future-proof all the way back to the 2020

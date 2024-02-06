@@ -3,8 +3,10 @@ from ast import literal_eval
 from datetime import datetime  # planned to use timedelta but not useful
 
 from api_functions.miscellaneous_api import recover_get_response
+from minor_modules.helpers import time_interval_sanitizer
 
 
+@time_interval_sanitizer()
 def obtain_earliest_timestamp(
         symbol: str, mic_code: str = None, exchange: str = None,
         time_interval: str = None, timezone: str = None, api_type: str = None):
@@ -33,6 +35,7 @@ def obtain_earliest_timestamp(
     return result
 
 
+@time_interval_sanitizer()
 def download_time_series(symbol: str, exchange=None, mic_code=None, currency=None,
                          start_date: datetime = None, end_date: datetime = None, date: datetime = None,
                          points=5000, data_type=None, time_interval=None, api_type=None):
@@ -88,6 +91,7 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
     return results
 
 
+@time_interval_sanitizer()
 def download_full_equity_history(
         symbol: str, time_interval=None, mic_code=None, exchange=None, currency=None, verbose=False):
     """
@@ -139,7 +143,9 @@ def download_full_equity_history(
         "data_type": "json",
     }
 
-    for j in range(100):  # limited number of repeats just for safety - ~499k points potential anyway...
+    # following loop, when invoked on "1min" timeseries can download about 5 years worth of historical data
+    # at the moment of making this (start of 2024) this is enough.
+    for j in range(150):  # limited number of repeats just for safety - ~748k points potential anyway...
         partial_data = download_time_series(**download_params, api_type=api_type)
 
         if isinstance(partial_data, str):
@@ -218,11 +224,13 @@ def download_full_equity_history(
 
 
 if __name__ == '__main__':
-    stock = "OTEX"
+    stock = "NVDA"
     # following is ~250k rows download
     # time_series = download_full_equity_history(symbol=stock)
     # with open('../db_functions/otex_series_OG.txt', 'w', encoding="UTF-8", newline='\n') as api_test:
     #     for entry in time_series:
     #         print(type(entry))
     #         api_test.write(str(entry) + "\n")
-    print(obtain_earliest_timestamp("OTEX", mic_code="XNGS", time_interval='1day'))
+    print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1day'))
+    sleep(8)
+    print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1min'))
