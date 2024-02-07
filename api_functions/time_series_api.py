@@ -2,7 +2,7 @@ from time import time, sleep
 from ast import literal_eval
 from datetime import datetime  # planned to use timedelta but not useful
 
-from api_functions.miscellaneous_api import recover_get_response
+from api_functions.miscellaneous_api import parse_get_response
 from minor_modules.helpers import time_interval_sanitizer
 
 
@@ -26,7 +26,7 @@ def obtain_earliest_timestamp(
     if exchange:
         querystring['exchange'] = exchange
 
-    result = recover_get_response(
+    result = parse_get_response(
         querystring,
         request_type="earliest_timestamp",
         data_type="json",
@@ -81,8 +81,8 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
     if exchange:
         querystring['exchange'] = exchange
 
-    results = recover_get_response(
-        querystring=querystring,
+    results = parse_get_response(
+        querystring_parameters=querystring,
         request_type="time_series",
         data_type=data_type,
         api_type=api_type,
@@ -231,6 +231,6 @@ if __name__ == '__main__':
     #     for entry in time_series:
     #         print(type(entry))
     #         api_test.write(str(entry) + "\n")
-    print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1day'))
-    sleep(8)
-    print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1min'))
+    print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1day', api_type='rapid'))
+    # sleep(8)
+    # print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1min'))

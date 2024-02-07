@@ -12,9 +12,9 @@ INSERT INTO public."markets" ("ID", name, access, timezone, country, code)
 VALUES (
     {index},
     {market_name},
-    (SELECT "ID" FROM public.plans p WHERE p.plan = {market_plan}),
-    (SELECT "ID" FROM public.timezones t WHERE t.name = {market_timezone}),
-    (SELECT "ID" FROM "public".countries c WHERE c.name = {market_country}),
+    (SELECT \"ID\" FROM public.plans p WHERE p.plan = {market_plan}),
+    (SELECT \"ID\" FROM public.timezones t WHERE t.name = {market_timezone}),
+    (SELECT \"ID\" FROM "public".countries c WHERE c.name = {market_country}),
     {market_code}
 );
 '''
@@ -82,14 +82,22 @@ def insert_markets(markets: list[dict]):
 
 
 if __name__ == '__main__':
-    with open("markets_plans.txt", 'r', newline='\n', encoding='UTF-8') as markets_text:
-        data = literal_eval(markets_text.read())['data']
+    sample_data = [
+        {'name': 'BHB', 'code': 'XBAH', 'country': 'Bahrain', 'timezone': 'Asia/Bahrain',
+         'access': {'global': 'Level C', 'plan': 'Enterprise'}},
+        {'name': 'OMX', 'code': 'XSTO', 'country': 'Sweden', 'timezone': 'Europe/Stockholm',
+         'access': {'global': 'Level B', 'plan': 'Pro'}},
+        {'name': 'Spotlight Stock Market', 'code': 'XSAT', 'country': 'Sweden', 'timezone': 'Europe/Stockholm',
+         'access': {'global': 'Level B', 'plan': 'Pro'}},
+        {'name': 'SIX', 'code': 'XSWX', 'country': 'Switzerland', 'timezone': 'Europe/Zurich',
+         'access': {'global': 'Level B', 'plan': 'Pro'}}
+    ]
 
     plans = set()
     countries = set()
     timezones = set()
 
-    for e in data:
+    for e in sample_data:
         access_obj = {
             'plan': e["access"]['plan'],
             "global": e["access"]['global'],
@@ -101,4 +109,4 @@ if __name__ == '__main__':
     insert_timezones(timezones)
     insert_countries(countries)
     insert_plans(plans)
-    insert_markets(data)
+    insert_markets(sample_data)

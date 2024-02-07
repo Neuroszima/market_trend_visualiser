@@ -39,6 +39,9 @@ def insert_stocks(stocks: list[dict]):
         for index, stock in enumerate(stocks):
             if index % 1000 == 0:
                 print(index)
+            if any([
+
+            ]): continue
             query_dict = {
                 "index": index,
                 "stock_symbol": db_string_converter(stock["symbol"]),
@@ -60,16 +63,31 @@ def insert_stocks(stocks: list[dict]):
     
 
 if __name__ == '__main__':
-    with open("stocks_with_access.txt", 'r', newline='\n', encoding='UTF-8') as stocks_list:
-        data = literal_eval(stocks_list.read())['data']
+    sample_data = [
+        {'symbol': '06MA', 'name': 'Materialise NV', 'currency': 'EUR', 'exchange': 'FSX',
+         'mic_code': 'XFRA', 'country': 'Germany', 'type': 'American Depositary Receipt',
+         'access': {'global': 'Level A', 'plan': 'Grow'}},
+        {'symbol': '000001', 'name': 'Ping An Bank Co., Ltd.', 'currency': 'CNY', 'exchange': 'SZSE',
+         'mic_code': 'XSHE', 'country': 'China', 'type': 'Common Stock',
+         'access': {'global': 'Level B', 'plan': 'Pro'}},
+        {'symbol': '0R2C', 'name': 'Endeavour Silver Corp.', 'currency': 'CAD', 'exchange': 'LSE',
+         'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
+         'access': {'global': 'Level A', 'plan': 'Grow'}},
+        {'symbol': '0R2D', 'name': 'Kinross Gold Corporation', 'currency': 'CAD', 'exchange': 'LSE',
+         'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
+         'access': {'global': 'Level A', 'plan': 'Grow'}},
+        {'symbol': '0R2E', 'name': 'Union Pacific Corporation', 'currency': 'USD', 'exchange': 'LSE',
+         'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
+         'access': {'global': 'Level A', 'plan': 'Grow'}},
+    ]
 
     equity_types = set()
 
-    for e in data:
+    for e in sample_data:
         equity_types.update((str(e['type']),))
 
     insert_investment_types(equity_types)
     # Freetrailer Group AS - do not have country
     # Whoosh Holding PAO - do not have country
-    insert_stocks(data)
+    insert_stocks(sample_data)
 

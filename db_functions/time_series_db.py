@@ -6,7 +6,7 @@ from db_functions import db_helpers
 from minor_modules.helpers import time_interval_sanitizer
 
 
-# queries
+# create queries
 create_time_table = """
 create table "{time_interval}_time_series"."{symbol}_{market_identification_code}" (
     "ID" integer not null,
@@ -20,10 +20,49 @@ create table "{time_interval}_time_series"."{symbol}_{market_identification_code
 );
 """
 
+# insert queries
+query_insert_equity_data = """
+INSERT INTO {time_series_schema}.\"{equity_symbol}_{market_identification_code}\" 
+(\"ID\", datetime, open, close, high, low, volume) 
+VALUES (
+    {index},
+    {timestamp}:: timestamp without time zone,
+    {open_price},
+    {close_price},
+    {high_price},
+    {low_price},
+    {volume}
+);
+"""  # the ":: timestamp.." is comment in PSQL, so it's ok
+
+# select queries
 last_timetable_point = """
 SELECT series.datetime FROM "{time_interval}_time_series"."{symbol}_{market_identification_code}" series 
 ORDER BY series."ID" DESC LIMIT 1
 """
+
+
+@time_interval_sanitizer()
+def insert_equity_historical_data(historical_data: list[dict], equity_symbol: str, mic_code: str, time_interval: str):
+    with psycopg2.connect(**db_helpers.connection_dict) as conn:
+        cur = conn.cursor()
+        #  iterate from oldest to newest - new rows will be appended to the farthest row anyway
+        for rownum, candle in enumerate(historical_data[::-1]):
+            query_dict = {
+                "index": rownum,
+                "equity_symbol": equity_symbol,
+                "time_series_schema": f'"{time_interval}_time_series"',
+                "market_identification_code": mic_code,
+                "timestamp": f"'{candle['datetime']}'",
+                "open_price": candle['open'],
+                "close_price": candle['close'],
+                "high_price": candle['high'],
+                "low_price": candle['low'],
+                "volume": candle['volume'],
+            }
+            cur.execute(query_insert_equity_data.format(**query_dict))
+            conn.commit()
+        cur.close()
 
 
 @time_interval_sanitizer()
@@ -91,11 +130,4 @@ if __name__ == '__main__':
     t = time_series_latest_timestamp(stock_, market_identification_code_, "1min")
     print(t)
     print(type(t))
-
-    # params = {
-    #     "symbol": stock,
-    #     "market_identification_code": market_identification_code,
-    #     "time_interval": "1min",
-    # }
-    # create_time_series(**params)
 

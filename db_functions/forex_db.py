@@ -23,6 +23,7 @@ values (
 
 
 def insert_currencies(currencies: set[str]):
+    """fill currencies table with all the available currencies from TwelveData API"""
     with psycopg2.connect(**connection_dict) as conn:
         cur = conn.cursor()
         for index, c in enumerate(sorted(currencies)):
@@ -36,6 +37,7 @@ def insert_currencies(currencies: set[str]):
 
 
 def insert_forex_currency_groups(forex_currency_groups: set[str]):
+    """fill currencies table with all the available currency groups from TwelveData API"""
     with psycopg2.connect(**connection_dict) as conn:
         cur = conn.cursor()
         for index, g in enumerate(sorted(forex_currency_groups)):
@@ -46,7 +48,8 @@ def insert_forex_currency_groups(forex_currency_groups: set[str]):
         cur.close()
 
 
-def insert_forex_pairs(pairs: list[dict]):
+def insert_forex_pairs_available(pairs: list[dict]):
+    """fill currencies table with all the tradeable currency pairs covered by TwelveData API"""
     with psycopg2.connect(**connection_dict) as conn:
         cur = conn.cursor()
         for index, pair_dict in enumerate(pairs):
@@ -63,14 +66,22 @@ def insert_forex_pairs(pairs: list[dict]):
 
 
 if __name__ == '__main__':
-    with open("forex_pairs_with_access.txt", 'r', newline='\n', encoding='UTF-8') as forex_list:
-        data = literal_eval(forex_list.read())['data']
+    sample_data = [
+        {'symbol': 'AED/BRL', 'currency_group': 'Exotic-Cross', 'currency_base': 'UAE Dirham',
+         'currency_quote': 'Brazil Real'},
+        {'symbol': 'JPY/XOF', 'currency_group': 'Exotic-Cross', 'currency_base': 'Japanese Yen',
+         'currency_quote': 'West African CFA franc'},
+        {'symbol': 'JPY/ZAR', 'currency_group': 'Exotic-Cross', 'currency_base': 'Japanese Yen',
+         'currency_quote': 'South African Rand'},
+        {'symbol': 'KGS/RUB', 'currency_group': 'Minor', 'currency_base': 'Kyrgyzstan som',
+         'currency_quote': 'Russian Ruble'},
+    ]
 
     currencies = set()
     currency_groups = set()
 
     # print(data[0])
-    for forex_pair_data in data:
+    for forex_pair_data in sample_data:
 
         # currencies
         currency_symbols: list = forex_pair_data['symbol'].split('/')
@@ -92,4 +103,4 @@ if __name__ == '__main__':
 
     insert_forex_currency_groups(currency_groups)
     insert_currencies(currencies)
-    insert_forex_pairs(data)
+    insert_forex_pairs_available(sample_data)
