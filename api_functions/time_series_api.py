@@ -2,12 +2,13 @@ from time import time, sleep
 from ast import literal_eval
 from datetime import datetime  # planned to use timedelta but not useful
 
-from api_functions.miscellaneous_api import parse_get_response
-from minor_modules.helpers import time_interval_sanitizer
+from api_functions.miscellaneous_api import parse_get_response_
+from minor_modules import time_interval_sanitizer
+# from minor_modules.helpers import time_interval_sanitizer
 
 
 @time_interval_sanitizer()
-def obtain_earliest_timestamp(
+def obtain_earliest_timestamp_(
         symbol: str, mic_code: str = None, exchange: str = None,
         time_interval: str = None, timezone: str = None, api_type: str = None):
     if not time_interval:
@@ -26,7 +27,7 @@ def obtain_earliest_timestamp(
     if exchange:
         querystring['exchange'] = exchange
 
-    result = parse_get_response(
+    result = parse_get_response_(
         querystring,
         request_type="earliest_timestamp",
         data_type="json",
@@ -36,9 +37,9 @@ def obtain_earliest_timestamp(
 
 
 @time_interval_sanitizer()
-def download_time_series(symbol: str, exchange=None, mic_code=None, currency=None,
-                         start_date: datetime = None, end_date: datetime = None, date: datetime = None,
-                         points=5000, data_type=None, time_interval=None, api_type=None):
+def download_time_series_(symbol: str, exchange=None, mic_code=None, currency=None,
+                          start_date: datetime = None, end_date: datetime = None, date: datetime = None,
+                          points=5000, data_type=None, time_interval=None, api_type=None):
     """
     recover data from API by performing a single query, passing required parameters to the POST request body
     maximum number of data points (candles) a single query can yield is 5000
@@ -81,7 +82,7 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
     if exchange:
         querystring['exchange'] = exchange
 
-    results = parse_get_response(
+    results = parse_get_response_(
         querystring_parameters=querystring,
         request_type="time_series",
         data_type=data_type,
@@ -92,7 +93,7 @@ def download_time_series(symbol: str, exchange=None, mic_code=None, currency=Non
 
 
 @time_interval_sanitizer()
-def download_full_equity_history(
+def download_full_equity_history_(
         symbol: str, time_interval=None, mic_code=None, exchange=None, currency=None, verbose=False):
     """
     Automates the process of downloading entire history of the index, from the TwelveData provider
@@ -118,7 +119,7 @@ def download_full_equity_history(
     # In other words - even if you do "counting per minute",
     # depleting all the tokens in first few seconds of that minute will result in an error on another read
     # if proceeded too fast, even after clocked 60 seconds pass
-    earliest_timestamp = obtain_earliest_timestamp(symbol, api_type=api_type, time_interval=time_interval)
+    earliest_timestamp = obtain_earliest_timestamp_(symbol, api_type=api_type, time_interval=time_interval)
     sleep(8)
 
     work_period_start = time()
@@ -146,7 +147,7 @@ def download_full_equity_history(
     # following loop, when invoked on "1min" timeseries can download about 5 years worth of historical data
     # at the moment of making this (start of 2024) this is enough.
     for j in range(150):  # limited number of repeats just for safety - ~748k points potential anyway...
-        partial_data = download_time_series(**download_params, api_type=api_type)
+        partial_data = download_time_series_(**download_params, api_type=api_type)
 
         if isinstance(partial_data, str):
             d = literal_eval(partial_data)
@@ -231,6 +232,6 @@ if __name__ == '__main__':
     #     for entry in time_series:
     #         print(type(entry))
     #         api_test.write(str(entry) + "\n")
-    print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1day', api_type='rapid'))
+    print(obtain_earliest_timestamp_(stock, mic_code="XNGS", time_interval='1day', api_type='rapid'))
     # sleep(8)
     # print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1min'))

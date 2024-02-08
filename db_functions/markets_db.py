@@ -1,13 +1,13 @@
 from ast import literal_eval
 import psycopg2
-from db_helpers import connection_dict, db_string_converter
+from db_functions.db_helpers import _connection_dict, db_string_converter_
 
 
 # insert queries
-query_insert_country = "INSERT INTO countries (\"ID\", name) VALUES ({index}, {country_name});"
-query_insert_timezone = "INSERT INTO timezones (\"ID\", name) VALUES ({index}, {timezone_name});"
-query_insert_plans = "INSERT INTO plans (\"ID\", global, plan) VALUES ({index}, {access_global}, {access_plan});"
-query_insert_markets = '''
+_query_insert_country = "INSERT INTO countries (\"ID\", name) VALUES ({index}, {country_name});"
+_query_insert_timezone = "INSERT INTO timezones (\"ID\", name) VALUES ({index}, {timezone_name});"
+_query_insert_plans = "INSERT INTO plans (\"ID\", global, plan) VALUES ({index}, {access_global}, {access_plan});"
+_query_insert_markets = '''
 INSERT INTO public."markets" ("ID", name, access, timezone, country, code)
 VALUES (
     {index},
@@ -20,63 +20,63 @@ VALUES (
 '''
 
 
-def insert_countries(countries: set):
-    with psycopg2.connect(**connection_dict) as conn:
+def insert_countries_(countries: set):
+    with psycopg2.connect(**_connection_dict) as conn:
         # conn: connection.connection
         # cur: cursor.cursor
         cur = conn.cursor()
         for index, c in enumerate(sorted(countries)):
-            country = db_string_converter(c)
-            cur.execute(query_insert_country.format(index=index, country_name=country))
+            country = db_string_converter_(c)
+            cur.execute(_query_insert_country.format(index=index, country_name=country))
             conn.commit()
         cur.close()
 
 
-def insert_timezones(timezones: set[str]):
+def insert_timezones_(timezones: set[str]):
     """insert into table a unique set of available timezones covered by API"""
-    with psycopg2.connect(**connection_dict) as conn:
+    with psycopg2.connect(**_connection_dict) as conn:
         # conn: connection.connection
         # cur: cursor.cursor
         cur = conn.cursor()
         for index, t in enumerate(sorted(timezones)):
-            timezone = db_string_converter(t)
-            cur.execute(query_insert_timezone.format(index=index, timezone_name=timezone))
+            timezone = db_string_converter_(t)
+            cur.execute(_query_insert_timezone.format(index=index, timezone_name=timezone))
             conn.commit()
         cur.close()
 
 
-def insert_plans(plans: set[str]):
+def insert_plans_(plans: set[str]):
     """
     insert available paid/free subscription plans
     the input set is actually set of str representations of dicts
     """
-    with psycopg2.connect(**connection_dict) as conn:
+    with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         for index, plan in enumerate(plans):
             query_start = literal_eval(plan)
             query_dict = dict()
             for key in query_start:
-                query_dict["access_"+key] = db_string_converter(query_start[key])
+                query_dict["access_"+key] = db_string_converter_(query_start[key])
             query_dict['index'] = index
-            cur.execute(query_insert_plans.format(**query_dict))
+            cur.execute(_query_insert_plans.format(**query_dict))
             conn.commit()
         cur.close()
 
 
-def insert_markets(markets: list[dict]):
-    with psycopg2.connect(**connection_dict) as conn:
+def insert_markets_(markets: list[dict]):
+    with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         for index, market in enumerate(markets):
             query_dict = {
                 "index": index,
-                "market_name": db_string_converter(market['name']),
-                "market_code": db_string_converter(market['code']),
-                "market_plan": db_string_converter(market['access']['plan']),
-                "market_timezone": db_string_converter(market['timezone']),
-                "market_country": db_string_converter(market['country'])
+                "market_name": db_string_converter_(market['name']),
+                "market_code": db_string_converter_(market['code']),
+                "market_plan": db_string_converter_(market['access']['plan']),
+                "market_timezone": db_string_converter_(market['timezone']),
+                "market_country": db_string_converter_(market['country'])
             }
-            print(query_insert_markets.format(**query_dict))
-            cur.execute(query_insert_markets.format(**query_dict))
+            print(_query_insert_markets.format(**query_dict))
+            cur.execute(_query_insert_markets.format(**query_dict))
             conn.commit()
         cur.close()
 
@@ -85,12 +85,12 @@ if __name__ == '__main__':
     sample_data = [
         {'name': 'BHB', 'code': 'XBAH', 'country': 'Bahrain', 'timezone': 'Asia/Bahrain',
          'access': {'global': 'Level C', 'plan': 'Enterprise'}},
-        {'name': 'OMX', 'code': 'XSTO', 'country': 'Sweden', 'timezone': 'Europe/Stockholm',
+        {'name': 'SZSE', 'code': 'XSHE', 'country': 'China', 'timezone': 'Asia/Shanghai',
          'access': {'global': 'Level B', 'plan': 'Pro'}},
-        {'name': 'Spotlight Stock Market', 'code': 'XSAT', 'country': 'Sweden', 'timezone': 'Europe/Stockholm',
-         'access': {'global': 'Level B', 'plan': 'Pro'}},
-        {'name': 'SIX', 'code': 'XSWX', 'country': 'Switzerland', 'timezone': 'Europe/Zurich',
-         'access': {'global': 'Level B', 'plan': 'Pro'}}
+        {'name': 'LSE', 'code': 'XLON', 'country': 'United Kingdom', 'timezone': 'Europe/London',
+         'access': {'global': 'Level A', 'plan': 'Grow'}},
+        {'name': 'NASDAQ', 'code': 'XNGS', 'country': 'United States', 'timezone': 'America/New_York',
+         'access': {'global': 'Basic', 'plan': 'Basic'}}
     ]
 
     plans = set()
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         countries.update((str(e['country']),))
         timezones.update((str(e['timezone']),))
 
-    insert_timezones(timezones)
-    insert_countries(countries)
-    insert_plans(plans)
-    insert_markets(sample_data)
+    insert_timezones_(timezones)
+    insert_countries_(countries)
+    insert_plans_(plans)
+    insert_markets_(sample_data)

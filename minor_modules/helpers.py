@@ -1,7 +1,7 @@
 from typing import Callable
 
 
-class time_interval_sanitizer:
+class time_interval_sanitizer_:
     """
     class decorator that checks if time_interval function argument happens to be one of the allowed values
     """

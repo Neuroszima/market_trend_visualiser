@@ -3,7 +3,7 @@ from datetime import datetime
 import psycopg2
 
 from db_functions import db_helpers
-from minor_modules.helpers import time_interval_sanitizer
+from minor_modules import time_interval_sanitizer
 
 
 # create queries
@@ -43,8 +43,11 @@ ORDER BY series."ID" DESC LIMIT 1
 
 
 @time_interval_sanitizer()
-def insert_equity_historical_data(historical_data: list[dict], equity_symbol: str, mic_code: str, time_interval: str):
-    with psycopg2.connect(**db_helpers.connection_dict) as conn:
+def insert_equity_historical_data_(historical_data: list[dict], equity_symbol: str, mic_code: str, time_interval: str):
+    """
+    Insert historical data for given equity into the database. Earliest timestamped rows are inserted first
+    """
+    with psycopg2.connect(**db_helpers._connection_dict) as conn:
         cur = conn.cursor()
         #  iterate from oldest to newest - new rows will be appended to the farthest row anyway
         for rownum, candle in enumerate(historical_data[::-1]):
@@ -66,17 +69,17 @@ def insert_equity_historical_data(historical_data: list[dict], equity_symbol: st
 
 
 @time_interval_sanitizer()
-def time_series_table_exists(symbol: str, market_identification_code: str, time_interval: str) -> bool:
+def time_series_table_exists_(symbol: str, market_identification_code: str, time_interval: str) -> bool:
     """
     check if the given table exists in the time-specific schema
     """
-    with psycopg2.connect(**db_helpers.connection_dict) as conn:
+    with psycopg2.connect(**db_helpers._connection_dict) as conn:
         cur = conn.cursor()
-        table_name = db_helpers.db_string_converter(f"{symbol}_{market_identification_code}")
+        table_name = db_helpers.db_string_converter_(f"{symbol}_{market_identification_code}")
         time_series_schema = f'{time_interval}_time_series'
-        cur.execute(db_helpers.information_schema_time_series_check.format(
+        cur.execute(db_helpers._information_schema_time_series_check.format(
             table_name=table_name,
-            time_series_schema=db_helpers.db_string_converter(time_series_schema),
+            time_series_schema=db_helpers.db_string_converter_(time_series_schema),
         ))
         result = cur.fetchall()
         if result:
@@ -85,14 +88,14 @@ def time_series_table_exists(symbol: str, market_identification_code: str, time_
 
 
 @time_interval_sanitizer()
-def create_time_series(symbol: str, market_identification_code: str, time_interval: str) -> None:
+def create_time_series_(symbol: str, market_identification_code: str, time_interval: str) -> None:
     """
     creates table inside database schema, that corresponds to time_interval passed into function call
 
     each time interval has corresponding database schema that saves stock market price history
     for the given symbol/MIC pair
     """
-    with psycopg2.connect(**db_helpers.connection_dict) as conn:
+    with psycopg2.connect(**db_helpers._connection_dict) as conn:
         cur = conn.cursor()
         q_dict = {
             "market_identification_code": market_identification_code,
@@ -101,16 +104,16 @@ def create_time_series(symbol: str, market_identification_code: str, time_interv
             "time_interval": time_interval,
         }
         cur.execute(create_time_table.format(**q_dict))
-    assert time_series_table_exists(symbol, market_identification_code, time_interval)
+    assert time_series_table_exists_(symbol, market_identification_code, time_interval)
 
 
 @time_interval_sanitizer()
-def time_series_latest_timestamp(symbol: str, market_identification_code: str, time_interval: str) -> datetime:
+def time_series_latest_timestamp_(symbol: str, market_identification_code: str, time_interval: str) -> datetime:
     """
     grab the latest datapoint from a timeseries and extract the data from it in the format ready to be
     consumed by API loader
     """
-    with psycopg2.connect(**db_helpers.connection_dict) as conn:
+    with psycopg2.connect(**db_helpers._connection_dict) as conn:
         cur = conn.cursor()
         q_dict = {
             "market_identification_code": market_identification_code,
@@ -126,8 +129,8 @@ def time_series_latest_timestamp(symbol: str, market_identification_code: str, t
 
 if __name__ == '__main__':
     stock_, market_identification_code_ = "OTEX", "XNGS"
-    assert time_series_table_exists(stock_, market_identification_code_, "1min")
-    t = time_series_latest_timestamp(stock_, market_identification_code_, "1min")
+    # assert _time_series_table_exists(stock_, market_identification_code_, "1min")
+    t = time_series_latest_timestamp_(stock_, market_identification_code_, "1min")
     print(t)
     print(type(t))
 

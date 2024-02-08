@@ -8,7 +8,7 @@ import requests
 JSON_RESPONSE = dict[Literal['data', 'status']]
 
 
-def parse_get_response(
+def parse_get_response_(
         querystring_parameters: dict, request_type: None | str = None,
         data_type: None | str = None, api_type: None | str = None) -> dict | str:
     """
@@ -71,12 +71,12 @@ def parse_get_response(
     return result
 
 
-def get_api_usage():
+def get_api_usage_():
     """rapidAPI solution does not allow for getting daily api usage"""
-    return parse_get_response(dict(), data_type="json", api_type="regular")
+    return parse_get_response_(dict(), data_type="json", api_type="regular")
 
 
-def get_all_equities(
+def get_all_equities_(
         api_type: str, data_type: str, additional_params: dict | None = None) -> JSON_RESPONSE | str:
     """
     obtain a list of stocks with their corresponding info
@@ -86,25 +86,25 @@ def get_all_equities(
     """
     if not additional_params:
         additional_params = dict()
-    return parse_get_response(
+    return parse_get_response_(
         additional_params, request_type="list stocks", data_type=data_type, api_type=api_type)
 
 
-def get_all_currency_pairs(
+def get_all_currency_pairs_(
         api_type: str, data_type: str, additional_params: dict | None = None) -> JSON_RESPONSE | str:
     """obtain a list of forex pairs. These can be historically viewed by downloading time series"""
     if not additional_params:
         additional_params = dict()
-    return parse_get_response(
+    return parse_get_response_(
         additional_params, request_type="list pairs", data_type=data_type, api_type=api_type)
 
 
-def get_all_exchanges(
+def get_all_exchanges_(
         api_type: str, data_type: str, additional_params: dict | None = None) -> JSON_RESPONSE | str:
     """obtain a list of exchanges with their corresponding countries and other information"""
     if not additional_params:
         additional_params = dict()
-    return parse_get_response(
+    return parse_get_response_(
         additional_params, request_type="list exchanges", data_type=data_type, api_type=api_type)
 
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
         "mic": "XNGS",
         "interval": "1min",
     }
-    print(parse_get_response(
+    print(parse_get_response_(
         querystring,
         request_type='earliest_timestamp',
         data_type='json',

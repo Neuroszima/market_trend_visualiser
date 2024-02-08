@@ -1,9 +1,7 @@
-from ast import literal_eval
-
 import psycopg2
 from psycopg2._psycopg import Error
 
-from db_helpers import db_string_converter, connection_dict
+from db_functions.db_helpers import db_string_converter_, _connection_dict
 
 
 # insert queries
@@ -23,34 +21,32 @@ VALUES (
 """
 
 
-def insert_investment_types(equity_types):
-    with psycopg2.connect(**connection_dict) as conn:
+def insert_investment_types_(equity_types):
+    with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         for index, t in enumerate(sorted(equity_types)):
-            equity_name = db_string_converter(t)
+            equity_name = db_string_converter_(t)
             cur.execute(query_insert_equity_type.format(index=index, equity_name=equity_name))
             conn.commit()
         cur.close()
 
 
-def insert_stocks(stocks: list[dict]):
-    with psycopg2.connect(**connection_dict) as conn:
+def insert_stocks_(stocks: list[dict]):
+    with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         for index, stock in enumerate(stocks):
             if index % 1000 == 0:
                 print(index)
-            if any([
-
-            ]): continue
             query_dict = {
                 "index": index,
-                "stock_symbol": db_string_converter(stock["symbol"]),
-                "stock_name": db_string_converter(stock["name"]),
-                "currency_symbol": db_string_converter(stock["currency"].upper()),
-                "exchange_code": db_string_converter(stock["mic_code"]),
-                "stock_country": db_string_converter(stock["country"]),
-                "equity_name": db_string_converter(stock["type"]),
-                "access_plan": db_string_converter(stock["access"]["plan"]),
+                "stock_symbol": db_string_converter_(stock["symbol"]),
+                "stock_name": db_string_converter_(stock["name"]),
+                # upper prevents abominations like "GBp"
+                "currency_symbol": db_string_converter_(stock["currency"].upper()),
+                "exchange_code": db_string_converter_(stock["mic_code"]),
+                "stock_country": db_string_converter_(stock["country"]),
+                "equity_name": db_string_converter_(stock["type"]),
+                "access_plan": db_string_converter_(stock["access"]["plan"]),
             }
             try:
                 cur.execute(query_insert_stocks.format(**query_dict))
@@ -64,21 +60,18 @@ def insert_stocks(stocks: list[dict]):
 
 if __name__ == '__main__':
     sample_data = [
-        {'symbol': '06MA', 'name': 'Materialise NV', 'currency': 'EUR', 'exchange': 'FSX',
-         'mic_code': 'XFRA', 'country': 'Germany', 'type': 'American Depositary Receipt',
-         'access': {'global': 'Level A', 'plan': 'Grow'}},
-        {'symbol': '000001', 'name': 'Ping An Bank Co., Ltd.', 'currency': 'CNY', 'exchange': 'SZSE',
-         'mic_code': 'XSHE', 'country': 'China', 'type': 'Common Stock',
-         'access': {'global': 'Level B', 'plan': 'Pro'}},
-        {'symbol': '0R2C', 'name': 'Endeavour Silver Corp.', 'currency': 'CAD', 'exchange': 'LSE',
+        {'symbol': 'AADV', 'name': 'Albion Development VCT PLC', 'currency': 'GBp', 'exchange': 'LSE',
          'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
          'access': {'global': 'Level A', 'plan': 'Grow'}},
-        {'symbol': '0R2D', 'name': 'Kinross Gold Corporation', 'currency': 'CAD', 'exchange': 'LSE',
-         'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
-         'access': {'global': 'Level A', 'plan': 'Grow'}},
-        {'symbol': '0R2E', 'name': 'Union Pacific Corporation', 'currency': 'USD', 'exchange': 'LSE',
-         'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
-         'access': {'global': 'Level A', 'plan': 'Grow'}},
+        {'symbol': 'AAPL', 'name': 'Apple Inc', 'currency': 'USD', 'exchange': 'NASDAQ',
+         'mic_code': 'XNGS', 'country': 'United States', 'type': 'Common Stock',
+         'access': {'global': 'Basic', 'plan': 'Basic'}},
+        {'symbol': 'NVDA', 'name': 'NVIDIA Corp', 'currency': 'USD', 'exchange': 'NASDAQ',
+         'mic_code': 'XNGS', 'country': 'United States', 'type': 'Common Stock',
+         'access': {'global': 'Basic', 'plan': 'Basic'}},
+        {'symbol': 'OTEX', 'name': 'Open Text Corp', 'currency': 'USD', 'exchange': 'NASDAQ',
+         'mic_code': 'XNGS', 'country': 'United States', 'type': 'Common Stock',
+         'access': {'global': 'Basic', 'plan': 'Basic'}}
     ]
 
     equity_types = set()
@@ -86,8 +79,8 @@ if __name__ == '__main__':
     for e in sample_data:
         equity_types.update((str(e['type']),))
 
-    insert_investment_types(equity_types)
+    insert_investment_types_(equity_types)
     # Freetrailer Group AS - do not have country
     # Whoosh Holding PAO - do not have country
-    insert_stocks(sample_data)
+    insert_stocks_(sample_data)
 

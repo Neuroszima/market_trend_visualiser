@@ -16,6 +16,10 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+CREATE USER db_user;
+
+ALTER USER db_user WITH CREATEDB CREATEROLE LOGIN;
+
 --
 -- Name: 1day_time_series; Type: SCHEMA; Schema: -; Owner: db_user
 --
@@ -266,6 +270,59 @@ CREATE VIEW public.tracked_indexes AS
 
 ALTER TABLE public.tracked_indexes OWNER TO db_user;
 
+
+--
+-- Name: generate_financial_view(text); Type: FUNCTION; Schema: public; Owner: db_user
+--
+
+CREATE FUNCTION public.generate_financial_view_1day(tbl_name text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    view_name TEXT;
+BEGIN
+    view_name := tbl_name || '_view';
+
+    EXECUTE format('
+        CREATE OR REPLACE VIEW "public".%I AS
+        SELECT
+            *,
+            (fin_tab.open - fin_tab.close > 0) AS bearish,
+            (fin_tab.open - fin_tab.close < 0) AS bullish,
+            (ABS(fin_tab.high - fin_tab.low) > 5) AS strong_trend
+        FROM "1day_time_series".%I fin_tab', view_name, tbl_name);
+END;
+$$;
+
+
+ALTER FUNCTION public.generate_financial_view_1day(tbl_name text) OWNER TO db_user;
+
+
+--
+-- Name: generate_financial_view(text); Type: FUNCTION; Schema: public; Owner: db_user
+--
+
+CREATE FUNCTION public.generate_financial_view_1min(tbl_name text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    view_name TEXT;
+BEGIN
+    view_name := tbl_name || '_view';
+
+    EXECUTE format('
+        CREATE OR REPLACE VIEW "public".%I AS
+        SELECT
+            *,
+            (fin_tab.open - fin_tab.close > 0) AS bearish,
+            (fin_tab.open - fin_tab.close < 0) AS bullish,
+            (ABS(fin_tab.high - fin_tab.low) > 5) AS strong_trend
+        FROM "1min_time_series".%I fin_tab', view_name, tbl_name);
+END;
+$$;
+
+
+ALTER FUNCTION public.generate_financial_view_1min(tbl_name text) OWNER TO db_user;
 
 
 --

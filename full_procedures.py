@@ -1,8 +1,8 @@
 from time import sleep
 
-from api_functions import time_series_api, miscellaneous_api
-from minor_modules.helpers import time_interval_sanitizer
+import api_functions
 import db_functions
+from minor_modules import time_interval_sanitizer
 
 
 @time_interval_sanitizer()
@@ -10,14 +10,14 @@ def time_series_full_save(symbol: str, market_identification_code: str, time_int
     """
     automates entire process of downloading the data and then saving it directly into database from source
     """
-    if db_functions.time_series_db.time_series_table_exists(symbol, market_identification_code, time_interval=time_interval):
-        data = time_series_api.download_full_equity_history(
+    if db_functions.time_series_table_exists(symbol, market_identification_code, time_interval=time_interval):
+        data = api_functions.download_full_equity_history(
             symbol=symbol, mic_code=market_identification_code, verbose=verbose, time_interval=time_interval)
-        db_functions.time_series_db.insert_equity_historical_data(
+        db_functions.insert_equity_historical_data(
             data, equity_symbol=symbol, mic_code=market_identification_code, time_interval=time_interval)
     else:
         print("time series not created yet, creating new and downloading")
-        db_functions.time_series_db.create_time_series(symbol, market_identification_code, time_interval=time_interval)
+        db_functions.create_time_series(symbol, market_identification_code, time_interval=time_interval)
         time_series_full_save(symbol, market_identification_code, verbose=verbose, time_interval=time_interval)
         # raise db_helpers.TimeSeriesNotFoundError(f"Table {symbol}_{market_identification_code} "
         #                                          f"not present in time_series schema")
@@ -28,7 +28,7 @@ def time_series_full_update(symbol: str, market_identification_code: str, time_i
     """
     update time series of given symbol/exchange pair. Use last record in database to determine the query size
     """
-    if db_functions.time_series_db.time_series_table_exists(
+    if db_functions.time_series_table_exists(
             symbol, market_identification_code, time_interval=time_interval):
         pass
 
@@ -44,7 +44,7 @@ def fill_database():
     Fill in empty database with basic information to make it ready-to-use. After this step, it should be able to
     make timeseries views, as well as time series saves/updates
     """
-    forex_data: list[dict] = miscellaneous_api.get_all_currency_pairs('rapid', 'json')['data']
+    forex_data: list[dict] = api_functions.get_all_currency_pairs('rapid', 'json')['data']
     currencies = set()
     currency_groups = set()
 
@@ -69,13 +69,13 @@ def fill_database():
         # groups
         currency_groups.update((str(forex_pair_data['currency_group']), ))
 
-    db_functions.forex_db.insert_forex_currency_groups(currency_groups)
-    db_functions.forex_db.insert_currencies(currencies)
-    db_functions.forex_db.insert_forex_pairs_available(forex_data)
+    db_functions.insert_forex_currency_groups(currency_groups)
+    db_functions.insert_currencies(currencies)
+    db_functions.insert_forex_pairs_available(forex_data)
 
     # download stock exchanges data
     sleep(8)
-    stock_markets_data: list[dict] = miscellaneous_api.get_all_exchanges(
+    stock_markets_data: list[dict] = api_functions.get_all_exchanges(
         'rapid', 'json', additional_params={'show_plan': True})['data']
 
     plans = set()
@@ -92,30 +92,37 @@ def fill_database():
         countries.update((str(e['country']),))
         timezones.update((str(e['timezone']),))
 
-    db_functions.markets_db.insert_timezones(timezones)
-    db_functions.markets_db.insert_countries(countries)
-    db_functions.markets_db.insert_plans(plans)
-    db_functions.markets_db.insert_markets(forex_data)
+    db_functions.insert_timezones(timezones)
+    db_functions.insert_countries(countries)
+    db_functions.insert_plans(plans)
+    db_functions.insert_markets(forex_data)
 
     sleep(8)
-    stocks_data: list[dict] = miscellaneous_api.get_all_equities('rapid', 'json')['data']
+    stocks_data: list[dict] = api_functions.get_all_equities('rapid', 'json')['data']
 
     equity_types = set()
 
     for e in stocks_data:
         equity_types.update((str(e['type']),))
 
-    db_functions.stocks_db.insert_investment_types(equity_types)
+    db_functions.insert_investment_types(equity_types)
     # Freetrailer Group AS - do not have country
     # Whoosh Holding PAO - do not have country
-    db_functions.stocks_db.insert_stocks(forex_data)
+    db_functions.insert_stocks(forex_data)
+
+
+def refresh_database():
+    """prepare database as though it was a clean slate"""
+    db_functions.purge_db_structure()
+    db_functions.import_db_structure()
 
 
 if __name__ == '__main__':
-    params = {
-        "symbol": "NVDA",
-        "market_identification_code": "XNGS",
-        "time_interval": "1day",
-        "verbose": True,
-    }
-    time_series_full_save(**params)
+    # params = {
+    #     "symbol": "NVDA",
+    #     "market_identification_code": "XNGS",
+    #     "time_interval": "1day",
+    #     "verbose": True,
+    # }
+    # time_series_full_save(**params)
+    refresh_database()
