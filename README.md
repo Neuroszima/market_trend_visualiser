@@ -56,21 +56,24 @@ idea on how such investing system works.
 
 :heavy_check_mark: solve the problem of errors happening when data is downloaded too fast.
 
-:heavy_check_mark: prepare a function to automatically download full timeseries from the earliest possible timestamp available
+:heavy_check_mark: prepare a function to automatically download full timeseries from the earliest possible 
+timestamp available
 
 :heavy_check_mark: prepare a procedure to fill the database with miscellaneous data from data provider (like: timezones, 
 subscription plans, stock markets symbols, currency pair symbols, company symbols (per stock market), and other...)
 
 :heavy_minus_sign: track how many tokens have been used so far in a day
 
-:heavy_minus_sign: prepare a visual tool (very basic, for example in T-kinter) to mark which tickers have to be kept track of 
-automatically when running script
+:heavy_minus_sign: prepare a visual tool (very basic, for example in T-kinter) to mark which tickers have to be 
+kept track of automatically when running script
 
-:heavy_minus_sign: automate downloading stock data of certain stock market tickers, when running script on windows computer (for 
-example a cript that could be ran through windows/linux scheduler)
+:heavy_minus_sign: automate downloading stock data of certain stock market tickers, when running script on windows 
+computer (for example a cript that could be ran through windows/linux scheduler)
 
-:heavy_minus_sign: prepare simple data visualizer for already downloaded timeseries (limited one - latest 90 days or latest 90 minutes)
+:heavy_minus_sign: prepare simple data visualizer for already downloaded timeseries 
+(limited one - latest 90 days or latest 90 minutes)
 
-:heavy_minus_sign: prepare automatic creation script for creating a fresh database
+:heavy_minus_sign: prepare automatic creation script for creating a fresh database, which is initially 
+populated with a couple preselected stocks (kind of like "demo mode")
 
 :heavy_minus_sign: 1 minute timeseries download limits need to be future-proof all the way back to the 2020

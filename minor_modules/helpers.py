@@ -11,7 +11,12 @@ class time_interval_sanitizer_:
         def function_wrapper(*args, **kwargs):
             print(args, kwargs)
             # arg check, and following kwarg check if arg does not find anything
-            if "time_interval" not in kwargs:
+            if "time_interval" not in kwargs:  # special case of download functions, they have automated substitution
+                if function.__name__ in [
+                    "download_equity_history_", "download_time_series_",
+                ]:
+                    result = function(*args, **kwargs)
+                    return result
                 if args[-1] in self.ALLOWED_INTERVALS:
                     result = function(*args, **kwargs)
                     return result

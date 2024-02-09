@@ -8,7 +8,7 @@ from minor_modules import time_interval_sanitizer
 
 # create queries
 create_time_table = """
-create table "{time_interval}_time_series"."{symbol}_{market_identification_code}" (
+create table if not exists "{time_interval}_time_series"."{symbol}_{market_identification_code}" (
     "ID" integer not null,
     datetime timestamp without time zone,
     open numeric(10,5),
@@ -18,6 +18,11 @@ create table "{time_interval}_time_series"."{symbol}_{market_identification_code
     volume integer,
     constraint {lower_symbol}_time_series_pkey primary key("ID")
 );
+"""
+
+# drop queries
+drop_time_table = """
+drop table if exists "{time_interval}_time_series"."{symbol}_{market_identification_code}";
 """
 
 # insert queries
@@ -56,7 +61,7 @@ def insert_equity_historical_data_(historical_data: list[dict], equity_symbol: s
                 "equity_symbol": equity_symbol,
                 "time_series_schema": f'"{time_interval}_time_series"',
                 "market_identification_code": mic_code,
-                "timestamp": f"'{candle['datetime']}'",
+                "timestamp": f"{candle['datetime']}",
                 "open_price": candle['open'],
                 "close_price": candle['close'],
                 "high_price": candle['high'],
@@ -108,7 +113,7 @@ def create_time_series_(symbol: str, market_identification_code: str, time_inter
 
 
 @time_interval_sanitizer()
-def time_series_latest_timestamp_(symbol: str, market_identification_code: str, time_interval: str) -> datetime:
+def time_series_latest_timestamp_(symbol: str, market_identification_code: str, time_interval: str) -> datetime | None:
     """
     grab the latest datapoint from a timeseries and extract the data from it in the format ready to be
     consumed by API loader
@@ -123,14 +128,63 @@ def time_series_latest_timestamp_(symbol: str, market_identification_code: str, 
         cur.execute(
             last_timetable_point.format(**q_dict))
         last_record = cur.fetchall()
-        t_: datetime = last_record[0][0]  # this will already be a "datetime.datetime()" python object
+        try:
+            t_ = last_record[0][0]  # this will already be a "datetime.datetime()" python object
+        except IndexError:
+            t_ = None
         return t_
 
 
 if __name__ == '__main__':
     stock_, market_identification_code_ = "OTEX", "XNGS"
-    # assert _time_series_table_exists(stock_, market_identification_code_, "1min")
-    t = time_series_latest_timestamp_(stock_, market_identification_code_, "1min")
+    interval_ = "1min"
+
+    # clean for this mini-test
+    with psycopg2.connect(**db_helpers._connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(drop_time_table.format(
+            time_interval=interval_,
+            symbol=stock_,
+            market_identification_code=market_identification_code_
+        ))
+    create_time_series_(
+        symbol=stock_, market_identification_code=market_identification_code_, time_interval=interval_)
+
+    # populate table with dummy data
+    historical_dummy_data = [
+        {
+            "index": 1, "equity_symbol": stock_,
+            "time_series_schema": f'"{interval_}_time_series"',
+            "market_identification_code": market_identification_code_,
+            "datetime": f"'2020-03-24 09:36:00'",
+            "open": 1, "close": 3, "high": 4, "low": 0.50,
+            "volume": 190,
+        },
+        {
+            "index": 2, "equity_symbol": stock_,
+            "time_series_schema": f'"{interval_}_time_series"',
+            "market_identification_code": market_identification_code_,
+            "datetime": f"'2020-03-24 09:37:00'",
+            "open": 3, "close": 5, "high": 8, "low": 1.50,
+            "volume": 490,
+        }
+    ]
+    insert_equity_historical_data_(
+        historical_dummy_data, equity_symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
+    )
+
+    assert time_series_table_exists_(stock_, market_identification_code_, interval_)
+    t = time_series_latest_timestamp_(stock_, market_identification_code_, interval_)
     print(t)
     print(type(t))
 
+    # restore for other mini-tests
+    with psycopg2.connect(**db_helpers._connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(drop_time_table.format(
+            time_interval=interval_,
+            symbol=stock_,
+            market_identification_code=market_identification_code_
+        ))
+    create_time_series_(
+        symbol=stock_, market_identification_code=market_identification_code_, time_interval=interval_)

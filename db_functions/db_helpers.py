@@ -22,7 +22,11 @@ _connection_dict = {
 
 
 # helper errors
-class _TimeSeriesNotFoundError(Exception):
+class TimeSeriesNotFoundError_(Exception):
+    pass
+
+
+class TimeSeriesExists_(Exception):
     pass
 
 

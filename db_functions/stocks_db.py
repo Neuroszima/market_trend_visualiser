@@ -80,7 +80,5 @@ if __name__ == '__main__':
         equity_types.update((str(e['type']),))
 
     insert_investment_types_(equity_types)
-    # Freetrailer Group AS - do not have country
-    # Whoosh Holding PAO - do not have country
     insert_stocks_(sample_data)
 

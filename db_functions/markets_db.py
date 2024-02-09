@@ -93,20 +93,20 @@ if __name__ == '__main__':
          'access': {'global': 'Basic', 'plan': 'Basic'}}
     ]
 
-    plans = set()
-    countries = set()
-    timezones = set()
+    plans_ = set()
+    countries_ = set()
+    timezones_ = set()
 
     for e in sample_data:
         access_obj = {
             'plan': e["access"]['plan'],
             "global": e["access"]['global'],
         }
-        plans.update((str(access_obj),))
-        countries.update((str(e['country']),))
-        timezones.update((str(e['timezone']),))
+        plans_.update((str(access_obj),))
+        countries_.update((str(e['country']),))
+        timezones_.update((str(e['timezone']),))
 
-    insert_timezones_(timezones)
-    insert_countries_(countries)
-    insert_plans_(plans)
+    insert_timezones_(timezones_)
+    insert_countries_(countries_)
+    insert_plans_(plans_)
     insert_markets_(sample_data)
