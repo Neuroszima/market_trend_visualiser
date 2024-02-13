@@ -12,3 +12,4 @@ get_all_equities: Callable = miscellaneous_api.get_all_equities_
 get_all_exchanges: Callable = miscellaneous_api.get_all_exchanges_
 get_all_currency_pairs: Callable = miscellaneous_api.get_all_currency_pairs_
 parse_get_response: Callable = miscellaneous_api.parse_get_response_
+api_key_switcher: Callable = miscellaneous_api.api_key_switcher_
