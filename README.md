@@ -68,7 +68,7 @@ subscription plans, stock markets symbols, currency pair symbols, company symbol
 kept track of automatically when running script
 
 :heavy_minus_sign: automate downloading stock data of certain stock market tickers, when running script on windows 
-computer (for example a cript that could be ran through windows/linux scheduler)
+computer (for example a script that could be ran through windows/linux scheduler)
 
 :heavy_minus_sign: prepare simple data visualizer for already downloaded timeseries 
 (limited one - latest 90 days or latest 90 minutes)
@@ -77,3 +77,6 @@ computer (for example a cript that could be ran through windows/linux scheduler)
 populated with a couple preselected stocks (kind of like "demo mode")
 
 :heavy_minus_sign: 1 minute timeseries download limits need to be future-proof all the way back to the 2020
+
+:heavy_minus_sign: elastic ability to use multiple keys, mixed between both endpoints. Using keys is now made through 
+key permission lists that prevent quick token depletion, on the other enabling balanced downloads through threading
