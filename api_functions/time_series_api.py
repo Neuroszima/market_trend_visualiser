@@ -1,9 +1,10 @@
+from math import ceil
 from time import time, sleep
 from ast import literal_eval
 from datetime import datetime  # planned to use timedelta but not useful
 from typing import Literal
 
-from api_functions.miscellaneous_api import parse_get_response_
+from api_functions.miscellaneous_api import parse_get_response_, api_key_switcher_
 from minor_modules import time_interval_sanitizer
 
 TIMESTAMP = dict[Literal['datetime', 'unix_time'], [str, int]]
@@ -11,8 +12,8 @@ TIMESTAMP = dict[Literal['datetime', 'unix_time'], [str, int]]
 
 @time_interval_sanitizer()
 def obtain_earliest_timestamp_(
-        symbol: str, mic_code: str = None, exchange: str = None,
-        time_interval: str = None, timezone: str = None, api_type: str = None) -> TIMESTAMP:
+        symbol: str, api_key_pair: tuple, mic_code: str = None, exchange: str = None,
+        time_interval: str = None, timezone: str = None) -> TIMESTAMP:
     """ask api for the earliest datapoint of certain ticker in their database"""
     if not time_interval:
         time_interval = "1min"
@@ -34,15 +35,15 @@ def obtain_earliest_timestamp_(
         querystring,
         request_type="earliest_timestamp",
         data_type="json",
-        api_type=api_type
+        api_key_pair=api_key_pair
     )
     return result
 
 
 @time_interval_sanitizer()
-def download_time_series_(symbol: str, exchange=None, mic_code=None, currency=None,
+def download_time_series_(symbol: str, api_key_pair: tuple, exchange=None, mic_code=None, currency=None,
                           start_date: datetime = None, end_date: datetime = None, date: datetime = None,
-                          points=5000, data_type=None, time_interval=None, api_type=None):
+                          points=5000, data_type=None, time_interval=None):
     """
     recover data from API by performing a single query, passing required parameters to the POST request body
     maximum number of data points (candles) a single query can yield is 5000
@@ -69,8 +70,6 @@ def download_time_series_(symbol: str, exchange=None, mic_code=None, currency=No
     :param end_date: if alone, will yield results up to the "end"
     """
 
-    if api_type is None:
-        api_type = "rapid"
     if not currency:
         currency = "USD"
     if not mic_code:
@@ -80,7 +79,7 @@ def download_time_series_(symbol: str, exchange=None, mic_code=None, currency=No
     if not time_interval:
         time_interval = "1min"
     if not data_type:
-        data_type = "csv"
+        data_type = "json"
     querystring = {
         "currency": currency,
         # "exchange": exchange,
@@ -94,7 +93,6 @@ def download_time_series_(symbol: str, exchange=None, mic_code=None, currency=No
     if start_date:
         querystring['start_date'] = start_date.strftime('%Y-%m-%d %H:%M:%S')
     if end_date:
-        # "end_date": "2023-05-11 11:35:00"
         querystring['end_date'] = end_date.strftime('%Y-%m-%d %H:%M:%S')
     if date:
         querystring['date'] = date.strftime('%Y-%m-%d %H:%M:%S')
@@ -108,13 +106,13 @@ def download_time_series_(symbol: str, exchange=None, mic_code=None, currency=No
         querystring_parameters=querystring,
         request_type="time_series",
         data_type=data_type,
-        api_type=api_type,
+        api_key_pair=api_key_pair,
     )
 
     return results
 
 
-def preprocess_dates(start_date: datetime|None, end_date: datetime|None):
+def preprocess_dates_(start_date: datetime | None, end_date: datetime | None):
     """replace missing hours in both dates, if not formed correctly"""
 
     if start_date:
@@ -142,17 +140,37 @@ def preprocess_dates(start_date: datetime|None, end_date: datetime|None):
     return start_date, end_date
 
 
+def calculate_iterations_(first_historical_point: datetime, time_interval: str):
+    """
+    calculate how many trading days are there to download and then obtain number of iterations to get all of them
+    number of downloads is overestimated on purpose
+    """
+    current_date = datetime.now()
+    diff = current_date - first_historical_point
+    days = (diff.days + 1) * 0.74  # a bit more than 5/7 days in a week
+    if time_interval == '1day':
+        return ceil(days / 4999) + 1
+    elif time_interval == '1min':
+        return ceil(days * 390 / 4999) + 1
+    raise ValueError('time interval not suitable for calculating iterations')
+
+
 @time_interval_sanitizer()
 def download_equity_history_(
-        symbol: str, time_interval=None, mic_code=None, exchange=None, currency=None,
-        verbose=False, start_date: datetime = None, end_date: datetime = None):
+        symbol: str, api_key_permission_list: list | None = None, time_interval=None, mic_code=None,
+        exchange=None, currency=None, verbose=False, start_date: datetime = None, end_date: datetime = None):
     """
     Automates the process of downloading entire history of the index, from the TwelveData provider
     queries until the last datapoint/timestamp has been reached, which it checks separately in a different API query
 
     full history is downloaded when no timestamp is passed in the function body.
+
+    this method, internally, downloads data only in json format
     """
-    start_date, end_date = preprocess_dates(start_date, end_date)
+
+    start_date, end_date = preprocess_dates_(start_date, end_date)
+    key_switcher = api_key_switcher_(permitted_keys=api_key_permission_list)
+
     # print(f"{time_interval=}")
     if not time_interval:
         time_interval = "1min"
@@ -163,21 +181,14 @@ def download_equity_history_(
     if not currency:
         currency = "USD"
 
-    # decide which api to use first and start tracking api usage
-    api_type = "rapid"
-    rapid_used = False
-    regular_used = False
-
-    # we need to sleep 8 seconds after this - API provider uses averaging and too many
-    # requests in short time will mean "no more tries for you pal"
-    # In other words - even if you do "counting per minute",
-    # depleting all the tokens in first few seconds of that minute will result in an error on another read
-    # if proceeded too fast, even after clocked 60 seconds pass
+    # no more need for sleep of 8 seconds and calculations. Simply invoke "next(key_switcher)" to get the
+    # delay calculated automatically
     if not start_date:
-        earliest_timestamp = obtain_earliest_timestamp_(symbol, api_type=api_type, time_interval=time_interval)
+        earliest_timestamp = obtain_earliest_timestamp_(
+            symbol, time_interval=time_interval, mic_code=mic_code, api_key_pair=next(key_switcher))
+        print(f"{earliest_timestamp=}")
     else:
-        earliest_timestamp = end_date
-    sleep(8)
+        earliest_timestamp = start_date
 
     if time_interval == "1min":
         date_string = '%Y-%m-%d %H:%M:%S'
@@ -186,7 +197,6 @@ def download_equity_history_(
     else:
         raise ValueError("Improper argument for this API query. Possible intervals for this app: ('1min', '1day')")
 
-    work_period_start = time()
     full_time_series = []
     if isinstance(earliest_timestamp, dict):
         # print("target timestamp", earliest_timestamp['datetime'], work_period_start)
@@ -204,28 +214,25 @@ def download_equity_history_(
         "exchange": exchange,
         "currency": currency,
         # date params make it inefficient in terms of obtainable 5k data points per query
-        "end_date": first_historical_point,
-        "data_type": "json",
-        "start_date": start_date,
+        "end_date": end_date,
+        # "start_date": first_historical_point
     }
+    if start_date:
+        download_params['start_date'] = start_date
 
-    # following loop, when invoked on "1min" timeseries can download about 5 years worth of historical data
-    # at the moment of making this (start of 2024) this is enough.
-    for j in range(150):  # limited number of repeats just for safety - ~748k points potential anyway...
-        partial_data = download_time_series_(**download_params, api_type=api_type)
+    iterations = calculate_iterations_(first_historical_point, time_interval=time_interval)
+    print(iterations)
+    # return
+    for j in range(iterations):
+        partial_data: dict = download_time_series_(**download_params, api_key_pair=next(key_switcher))
 
-        if isinstance(partial_data, str):
-            d = literal_eval(partial_data)
-        else:
-            d = partial_data
+        # zeroth element in further queries would overlap and appear twice so its later truncated
+        if j == 0:
+            full_time_series.append(partial_data['values'][0])
 
-        try:
-            starting_record = d['values'][0]
-        except KeyError as e:
-            print(e)
-            print(d)
-            raise e
-        last_record = d['values'][-1]
+        print("len values", len(partial_data['values']))
+        starting_record: dict = partial_data['values'][0]
+        last_record: dict = partial_data['values'][-1]
         if verbose:
             if len(full_time_series) > 0:
                 print("last record tracked:", full_time_series[-1])
@@ -243,36 +250,19 @@ def download_equity_history_(
         new_latest_time_period = datetime.strptime(last_record['datetime'], conversion_string)
         # if starting_record:
         #     end_period = dat
-        full_time_series.extend(d['values'][1:])
+        full_time_series.extend(partial_data['values'][1:])
 
         if verbose:
-            print("downloaded rows", len(d['values']))
-            print("extending with removing duplicate row (new start: ", d['values'][1], ")")
+            print("downloaded rows", len(partial_data['values']))
+            print("extending with removing duplicate row (new start: ", partial_data['values'][1], ")")
 
         # check ending condition - data is downloaded backwards in time
-        if new_latest_time_period == first_historical_point or len(d['values']) < 4999:
+        if new_latest_time_period == first_historical_point or len(partial_data['values']) < 4999:
+            print(len(partial_data['values']) < 4999)
             print('end of download reached')
             break
 
-        print(f'next dump up until following date: {new_latest_time_period}')
-
-        # not finished yet? keep api usage in check to not get any errors in output
-        if api_type == "rapid":
-            rapid_used = True
-        elif api_type == "regular":
-            regular_used = True
-        # print("api usage count:", (rapid_used, regular_used))
-
-        if rapid_used:
-            # print("api type switch")
-            api_type = "regular"
-
-        if rapid_used and regular_used:
-            # print("api tokens depleted, switching back to rapid and sleep")
-            api_type = "rapid"
-            sleep(7.4)
-            rapid_used = False
-            regular_used = False
+        # print(f'next dump up until following date: {new_latest_time_period}')
 
         # params refresh after recent download
         download_params = {
@@ -281,11 +271,9 @@ def download_equity_history_(
             "exchange": exchange,
             "currency": currency,
             "end_date": new_latest_time_period,
-            "start_date": start_date,
-            "data_type": "json",
-            # using this, is not needed
-            # "date": new_latest_time_period,
         }
+        if start_date:
+            download_params['start_date'] = start_date
 
     # print(len(full_time_series))
     return full_time_series
@@ -293,14 +281,23 @@ def download_equity_history_(
 
 if __name__ == '__main__':
     stock = "NVDA"
+    # key_switcher_ = api_key_switcher_(['regular1', ...
+    # t = obtain_earliest_timestamp_(stock, mic_code="XNGS", time_interval='1min', api_key_pair=next(key_switcher_))
+    # print(calculate_iterations_(datetime.strptime(t['datetime'], '%Y-%m-%d %H:%M:%S'), "1min"))
+    # t2 = obtain_earliest_timestamp_(stock, mic_code="XNGS", time_interval='1day', api_key_pair=next(key_switcher_))
+    # print(calculate_iterations_(datetime.strptime(t2['datetime'], '%Y-%m-%d'), "1day"))
+
     time_series = download_equity_history_(
         symbol=stock,
         start_date=datetime(year=2022, month=4, day=20),
-        end_date=datetime(year=2022, month=7, day=20)
+        end_date=datetime(year=2022, month=7, day=20),
+        # api_key_permission_list=['regular1', ...
+        # if left empty, every key will be used and switched between
     )
+
     print(len(time_series))
     print(time_series[0])
     print(time_series[-1])
+    print()
+    print(time_series[4997:5003])  # see if there is no holes on the joint of 2 queries
 
-    print(obtain_earliest_timestamp_(stock, mic_code="XNGS", time_interval='1min', api_type='rapid'))
-    # print(obtain_earliest_timestamp(stock, mic_code="XNGS", time_interval='1min'))

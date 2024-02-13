@@ -133,7 +133,7 @@ def get_all_exchanges_(
         additional_params, request_type="list exchanges", data_type=data_type, api_key_pair=api_key_pair)
 
 
-def api_key_switcher(permitted_keys: Optional[list[str]] = None):
+def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
     """
     Prepare a collection of usable API keys, and use them cyclically
 
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         api_key_pair=api_key_pair_,
     ))
 
-    key_switcher: Generator = api_key_switcher(["regular0"])
+    key_switcher: Generator = api_key_switcher_(["regular0"])
     print(len(get_all_exchanges_(next(key_switcher), data_type='json')['data']))
     print(len(get_all_equities_(next(key_switcher), data_type='json')['data']))
     print(len(get_all_currency_pairs_(next(key_switcher), data_type='json')['data']))
