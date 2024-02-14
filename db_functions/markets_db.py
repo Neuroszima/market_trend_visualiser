@@ -1,4 +1,6 @@
 from ast import literal_eval
+from pprint import pprint
+
 import psycopg2
 from db_functions.db_helpers import _connection_dict, db_string_converter_
 
@@ -21,10 +23,19 @@ VALUES (
 
 
 def insert_countries_(countries: set):
+    """
+    insert information about countries, that is obtained from TwelveData API provider.
+
+    Usually this information will come in from other sources (like the list of available markets with their
+    respective countries), and will be scrapped that way. However, in any unfortunate case of something not having a
+    designated country, additional "Unknown" is added to not disrupt other functions. Such case might happen, when
+    "null" or "" value is fed from API that could disrupt DB constraints.
+    """
     with psycopg2.connect(**_connection_dict) as conn:
         # conn: connection.connection
         # cur: cursor.cursor
         cur = conn.cursor()
+        countries.update(('Unknown',))
         for index, c in enumerate(sorted(countries)):
             country = db_string_converter_(c)
             cur.execute(_query_insert_country.format(index=index, country_name=country))
@@ -67,15 +78,18 @@ def insert_markets_(markets: list[dict]):
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         for index, market in enumerate(markets):
+            country = market['country']
+            if country == "":
+                country = "Unknown"
             query_dict = {
                 "index": index,
                 "market_name": db_string_converter_(market['name']),
                 "market_code": db_string_converter_(market['code']),
                 "market_plan": db_string_converter_(market['access']['plan']),
                 "market_timezone": db_string_converter_(market['timezone']),
-                "market_country": db_string_converter_(market['country'])
+                "market_country": db_string_converter_(country),
             }
-            print(_query_insert_markets.format(**query_dict))
+            # print(_query_insert_markets.format(**query_dict))
             cur.execute(_query_insert_markets.format(**query_dict))
             conn.commit()
         cur.close()

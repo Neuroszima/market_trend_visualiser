@@ -37,6 +37,8 @@ def insert_stocks_(stocks: list[dict]):
         for index, stock in enumerate(stocks):
             if index % 1000 == 0:
                 print(index)
+            if stock["country"] == "":
+                stock["country"] = "Unknown"
             query_dict = {
                 "index": index,
                 "stock_symbol": db_string_converter_(stock["symbol"]),

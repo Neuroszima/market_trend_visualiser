@@ -74,15 +74,12 @@ def download_time_series_(symbol: str, api_key_pair: tuple, exchange=None, mic_c
         currency = "USD"
     if not mic_code:
         mic_code = "XNGS"
-    # if not exchange:
-    #     exchange = "NASDAQ"
     if not time_interval:
         time_interval = "1min"
     if not data_type:
         data_type = "json"
     querystring = {
         "currency": currency,
-        # "exchange": exchange,
         "mic_code": mic_code,
         "symbol": symbol,
         "interval": time_interval,
@@ -171,7 +168,6 @@ def download_equity_history_(
     start_date, end_date = preprocess_dates_(start_date, end_date)
     key_switcher = api_key_switcher_(permitted_keys=api_key_permission_list)
 
-    # print(f"{time_interval=}")
     if not time_interval:
         time_interval = "1min"
     if not mic_code:
@@ -186,7 +182,6 @@ def download_equity_history_(
     if not start_date:
         earliest_timestamp = obtain_earliest_timestamp_(
             symbol, time_interval=time_interval, mic_code=mic_code, api_key_pair=next(key_switcher))
-        print(f"{earliest_timestamp=}")
     else:
         earliest_timestamp = start_date
 
@@ -221,8 +216,6 @@ def download_equity_history_(
         download_params['start_date'] = start_date
 
     iterations = calculate_iterations_(first_historical_point, time_interval=time_interval)
-    print(iterations)
-    # return
     for j in range(iterations):
         partial_data: dict = download_time_series_(**download_params, api_key_pair=next(key_switcher))
 
@@ -230,10 +223,10 @@ def download_equity_history_(
         if j == 0:
             full_time_series.append(partial_data['values'][0])
 
-        print("len values", len(partial_data['values']))
         starting_record: dict = partial_data['values'][0]
         last_record: dict = partial_data['values'][-1]
         if verbose:
+            print("len values = ", len(partial_data['values']))
             if len(full_time_series) > 0:
                 print("last record tracked:", full_time_series[-1])
                 print(f"start of the current batch: {starting_record}")
@@ -258,8 +251,8 @@ def download_equity_history_(
 
         # check ending condition - data is downloaded backwards in time
         if new_latest_time_period == first_historical_point or len(partial_data['values']) < 4999:
-            print(len(partial_data['values']) < 4999)
-            print('end of download reached')
+            # print(len(partial_data['values']) < 4999)
+            # print('end of download reached')
             break
 
         # print(f'next dump up until following date: {new_latest_time_period}')

@@ -1,4 +1,4 @@
-from pprint import pprint
+# from pprint import pprint
 from time import perf_counter, sleep
 from typing import Literal, Optional, Generator
 
@@ -18,9 +18,6 @@ def parse_get_response_(
 
     :return: 'str' if 'csv' was passed as a 'data_type' argument, 'dict'['data', 'status'] when 'json'
     """
-    # print(request_type)
-    # print(querystring)
-
     # make sure request will look like this:
     # response = requests.get(url=EARLIEST_TIMESTAMP, params=querystring, headers=headers)
 
@@ -58,7 +55,7 @@ def parse_get_response_(
 
     get_request['url'] = api + endpoint
     get_request["params"] = querystring_parameters
-    pprint(get_request)
+    # pprint(get_request)
     response = requests.get(**get_request)
     match data_type:
         case "json":
@@ -160,7 +157,7 @@ def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
         for key_name in permitted_keys:
             yield key_name, keys_dict[key_name][0]
             keys_dict[key_name][1] = True
-            pprint(keys_dict)
+            # pprint(keys_dict)
         if (time_passed := perf_counter() - start) < 7.8:  # 8 requests per minute check
             sleep(7.8 - time_passed)
         # keys have "clocked out" - they can be used again without danger of "too fast" error
@@ -170,7 +167,7 @@ def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
 
 if __name__ == '__main__':
 
-    # mini tests - 2 possible ways of forming key tuples
+    # mini tests - 2 possible endpoints used to form key tuples
     api_key_pair_ = ('rapid0', rapid_api_keys['rapid0'])
     # api_key_pair_ = ('regular0', regular_api_keys['rapid0'])
     querystring = {
