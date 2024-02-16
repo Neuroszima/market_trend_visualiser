@@ -94,33 +94,3 @@ def insert_markets_(markets: list[dict]):
             conn.commit()
         cur.close()
 
-
-if __name__ == '__main__':
-    sample_data = [
-        {'name': 'BHB', 'code': 'XBAH', 'country': 'Bahrain', 'timezone': 'Asia/Bahrain',
-         'access': {'global': 'Level C', 'plan': 'Enterprise'}},
-        {'name': 'SZSE', 'code': 'XSHE', 'country': 'China', 'timezone': 'Asia/Shanghai',
-         'access': {'global': 'Level B', 'plan': 'Pro'}},
-        {'name': 'LSE', 'code': 'XLON', 'country': 'United Kingdom', 'timezone': 'Europe/London',
-         'access': {'global': 'Level A', 'plan': 'Grow'}},
-        {'name': 'NASDAQ', 'code': 'XNGS', 'country': 'United States', 'timezone': 'America/New_York',
-         'access': {'global': 'Basic', 'plan': 'Basic'}}
-    ]
-
-    plans_ = set()
-    countries_ = set()
-    timezones_ = set()
-
-    for e in sample_data:
-        access_obj = {
-            'plan': e["access"]['plan'],
-            "global": e["access"]['global'],
-        }
-        plans_.update((str(access_obj),))
-        countries_.update((str(e['country']),))
-        timezones_.update((str(e['timezone']),))
-
-    insert_timezones_(timezones_)
-    insert_countries_(countries_)
-    insert_plans_(plans_)
-    insert_markets_(sample_data)

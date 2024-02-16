@@ -13,7 +13,7 @@ class time_interval_sanitizer_:
             # arg check, and following kwarg check if arg does not find anything
             if "time_interval" not in kwargs:  # special case of download functions, they have automated substitution
                 if function.__name__ in [
-                    "download_equity_history_", "download_time_series_",
+                    "download_market_ticker_history_", "download_time_series_",
                 ]:
                     result = function(*args, **kwargs)
                     return result

@@ -23,7 +23,8 @@ insert_stocks: Callable = stocks_db.insert_stocks_
 insert_investment_types: Callable = stocks_db.insert_investment_types_
 
 create_time_series: Callable = time_series_db.create_time_series_
-time_series_latest_timestamp: Callable[[str, str, str], datetime] = time_series_db.time_series_latest_timestamp_
+time_series_latest_timestamp: Callable[[str, str, bool, str | None], datetime] = \
+    time_series_db.time_series_latest_timestamp_
 time_series_table_exists: Callable = time_series_db.time_series_table_exists_
 insert_equity_historical_data: Callable = time_series_db.insert_equity_historical_data_
 

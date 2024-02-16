@@ -16,6 +16,7 @@ drop_countries = "DROP TABLE IF EXISTS \"public\".countries CASCADE;"
 
 drop_schema_1day = "DROP SCHEMA IF EXISTS \"1day_time_series\" CASCADE;"
 drop_schema_1min = "DROP SCHEMA IF EXISTS \"1min_time_series\" CASCADE;"
+drop_schema_forex = "DROP SCHEMA IF EXISTS \"forex_time_series\" CASCADE;"
 
 drop_tracking_view = "DROP VIEW IF EXISTS \"public\".tracked_indexes;"
 
@@ -43,6 +44,7 @@ def purge_db_structure_():
 
         cur.execute(drop_schema_1day)
         cur.execute(drop_schema_1min)
+        cur.execute(drop_schema_forex)
 
         cur.execute(delete_function_1day_view)
         cur.execute(delete_function_1min_view)

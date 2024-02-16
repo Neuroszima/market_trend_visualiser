@@ -39,6 +39,15 @@ CREATE SCHEMA "1min_time_series";
 ALTER SCHEMA "1min_time_series" OWNER TO db_user;
 
 --
+-- Name: forex_time_series; Type: SCHEMA; Schema: -; Owner: db_user
+--
+
+CREATE SCHEMA "forex_time_series";
+
+
+ALTER SCHEMA "forex_time_series" OWNER TO db_user;
+
+--
 -- Name: adminpack; Type: EXTENSION; Schema: -; Owner: -
 --
 

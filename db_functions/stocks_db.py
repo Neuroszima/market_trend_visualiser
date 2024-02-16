@@ -58,29 +58,3 @@ def insert_stocks_(stocks: list[dict]):
                 raise e
             conn.commit()
         cur.close()
-    
-
-if __name__ == '__main__':
-    sample_data = [
-        {'symbol': 'AADV', 'name': 'Albion Development VCT PLC', 'currency': 'GBp', 'exchange': 'LSE',
-         'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
-         'access': {'global': 'Level A', 'plan': 'Grow'}},
-        {'symbol': 'AAPL', 'name': 'Apple Inc', 'currency': 'USD', 'exchange': 'NASDAQ',
-         'mic_code': 'XNGS', 'country': 'United States', 'type': 'Common Stock',
-         'access': {'global': 'Basic', 'plan': 'Basic'}},
-        {'symbol': 'NVDA', 'name': 'NVIDIA Corp', 'currency': 'USD', 'exchange': 'NASDAQ',
-         'mic_code': 'XNGS', 'country': 'United States', 'type': 'Common Stock',
-         'access': {'global': 'Basic', 'plan': 'Basic'}},
-        {'symbol': 'OTEX', 'name': 'Open Text Corp', 'currency': 'USD', 'exchange': 'NASDAQ',
-         'mic_code': 'XNGS', 'country': 'United States', 'type': 'Common Stock',
-         'access': {'global': 'Basic', 'plan': 'Basic'}}
-    ]
-
-    equity_types = set()
-
-    for e in sample_data:
-        equity_types.update((str(e['type']),))
-
-    insert_investment_types_(equity_types)
-    insert_stocks_(sample_data)
-
