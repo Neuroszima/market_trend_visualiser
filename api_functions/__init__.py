@@ -4,7 +4,7 @@ import api_functions.miscellaneous_api as miscellaneous_api
 import api_functions.time_series_api as time_series_api
 
 download_time_series: Callable = time_series_api.download_time_series_
-download_equity_history: Callable = time_series_api.download_equity_history_
+download_market_ticker_history: Callable = time_series_api.download_market_ticker_history_
 obtain_earliest_timestamp: Callable = time_series_api.obtain_earliest_timestamp_
 
 get_api_usage: Callable = miscellaneous_api.get_api_usage_

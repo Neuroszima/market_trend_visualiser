@@ -1,9 +1,10 @@
 # all data types here only cover the "json to python" conversion
 # these do not contain data types used in actual database
+# for now these reflect types that should be obtained in certain API tests
 from datetime import datetime
 
 
-stocks = {
+equities = {
     'symbol': str,
     'name': str,
     'currency': str,
@@ -37,7 +38,10 @@ cryptocurrencies = {
 }
 
 forex_pairs = {
-
+    'symbol': str,
+    'currency_group': str,
+    'currency_base': str,
+    'currency_quote': str
 }
 
 # following contain proper read rules to be used in "strptime"

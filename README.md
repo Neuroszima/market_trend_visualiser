@@ -65,7 +65,7 @@ idea on how such investing system works.
 :heavy_check_mark: prepare a function to automatically download full timeseries from the earliest possible 
 timestamp available
 
-:heavy_minus_sign: prepare a procedure to fill the database with miscellaneous data from data provider (like: timezones, 
+:heavy_check_mark: prepare a procedure to fill the database with miscellaneous data from data provider (like: timezones, 
 subscription plans, stock markets symbols, currency pair symbols, company symbols (per stock market), and other...)
 
 :heavy_check_mark: elastic ability to use multiple keys, mixed between both endpoints. Using keys is now made through 
@@ -73,7 +73,7 @@ key permission lists that prevent quick token depletion, on the other enabling b
 
 :heavy_check_mark: 1 minute and 1 day timeseries download calculates automatically how many tokens should be used
 
-:heavy_minus_sign: extend saving time series to forex data (additional schema and modification to download functions)
+:heavy_check_mark: extend saving time series to forex data (additional schema and modification to download functions)
 
 :heavy_minus_sign: prepare automatic creation script for creating a fresh database, which is initially 
 populated with a couple preselected stocks (kind of like "demo mode")

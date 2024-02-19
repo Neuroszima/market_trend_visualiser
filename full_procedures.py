@@ -59,11 +59,9 @@ def fill_database(api_key_permission_list: list | None = None):
     """
     # download all the necessary data
     key_switcher = api_functions.api_key_switcher(permitted_keys=api_key_permission_list)
-    forex_data: list[dict] = api_functions.get_all_currency_pairs(next(key_switcher), 'json')['data']
-    stock_markets_data: list[dict] = api_functions.get_all_exchanges(
-        next(key_switcher), 'json', additional_params={'show_plan': True})['data']
-    stocks_data: list[dict] = api_functions.get_all_equities(
-        next(key_switcher), 'json', additional_params={'show_plan': True})['data']
+    forex_data: list[dict] = api_functions.get_all_currency_pairs(next(key_switcher), 'json')
+    stock_markets_data: list[dict] = api_functions.get_all_exchanges(next(key_switcher), 'json')
+    stocks_data: list[dict] = api_functions.get_all_equities(next(key_switcher), 'json')
 
     # process downloaded forex data
     currencies = set()
@@ -125,8 +123,6 @@ def fill_database(api_key_permission_list: list | None = None):
         equity_types.update((str(e['type']),))
 
     db_functions.insert_investment_types(equity_types)
-    # Freetrailer Group AS - do not have country
-    # Whoosh Holding PAO - do not have country
     db_functions.insert_stocks(stocks_data)
 
 

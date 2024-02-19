@@ -80,7 +80,7 @@ def get_api_usage_(api_key_pair: tuple):
 
 
 def get_all_equities_(
-        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> JSON_RESPONSE | str:
+        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> list[dict]:
     """
     obtain a list of stocks with their corresponding info
 
@@ -93,13 +93,13 @@ def get_all_equities_(
     provided by TwelveData API to narrow down the searched parameters (as filters)
     """
     if not additional_params:
-        additional_params = dict()
+        additional_params = {'show_plan': True}
     return parse_get_response_(
-        additional_params, request_type="list stocks", data_type=data_type, api_key_pair=api_key_pair)
+        additional_params, request_type="list stocks", data_type=data_type, api_key_pair=api_key_pair)['data']
 
 
 def get_all_currency_pairs_(
-        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> JSON_RESPONSE | str:
+        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> list[dict]:
     """
     obtain a list of forex pairs. These can be historically viewed by downloading time series
 
@@ -111,11 +111,11 @@ def get_all_currency_pairs_(
     if not additional_params:
         additional_params = dict()
     return parse_get_response_(
-        additional_params, request_type="list pairs", data_type=data_type, api_key_pair=api_key_pair)
+        additional_params, request_type="list pairs", data_type=data_type, api_key_pair=api_key_pair)['data']
 
 
 def get_all_exchanges_(
-        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> JSON_RESPONSE | str:
+        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> list[dict]:
     """
     obtain a list of exchanges with their corresponding countries and other information
 
@@ -125,9 +125,9 @@ def get_all_exchanges_(
     provided by TwelveData API to narrow down the searched parameters
     """
     if not additional_params:
-        additional_params = dict()
+        additional_params = {'show_plan': True}
     return parse_get_response_(
-        additional_params, request_type="list exchanges", data_type=data_type, api_key_pair=api_key_pair)
+        additional_params, request_type="list exchanges", data_type=data_type, api_key_pair=api_key_pair)['data']
 
 
 def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
@@ -158,31 +158,9 @@ def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
             yield key_name, keys_dict[key_name][0]
             keys_dict[key_name][1] = True
             # pprint(keys_dict)
-        if (time_passed := perf_counter() - start) < 7.8:  # 8 requests per minute check
-            sleep(7.8 - time_passed)
+        if (time_passed := perf_counter() - start) < 7.85:  # 8 requests per minute check
+            sleep(7.85 - time_passed)
         # keys have "clocked out" - they can be used again without danger of "too fast" error
         for key_name in permitted_keys:
             keys_dict[key_name][1] = False
 
-
-if __name__ == '__main__':
-
-    # mini tests - 2 possible endpoints used to form key tuples
-    api_key_pair_ = ('rapid0', rapid_api_keys['rapid0'])
-    # api_key_pair_ = ('regular0', regular_api_keys['rapid0'])
-    querystring = {
-        "symbol": "NVDA",
-        "mic": "XNGS",
-        "interval": "1min",
-    }
-    print(parse_get_response_(
-        querystring,
-        request_type='earliest_timestamp',
-        data_type='json',
-        api_key_pair=api_key_pair_,
-    ))
-
-    key_switcher: Generator = api_key_switcher_(["regular0"])
-    print(len(get_all_exchanges_(next(key_switcher), data_type='json')['data']))
-    print(len(get_all_equities_(next(key_switcher), data_type='json')['data']))
-    print(len(get_all_currency_pairs_(next(key_switcher), data_type='json')['data']))
