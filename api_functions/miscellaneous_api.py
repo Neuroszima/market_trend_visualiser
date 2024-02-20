@@ -35,7 +35,7 @@ def parse_get_response_(
         case "list stocks":
             endpoint = LIST_OF_STOCKS_SYMBOLS
         case _:
-            if api_key_pair == "regular":
+            if "regular" in api_key_pair[0]:
                 endpoint = API_USAGE_URL
             else:
                 raise ValueError(f"request type value is invalid: {request_type}")
@@ -163,4 +163,3 @@ def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
         # keys have "clocked out" - they can be used again without danger of "too fast" error
         for key_name in permitted_keys:
             keys_dict[key_name][1] = False
-

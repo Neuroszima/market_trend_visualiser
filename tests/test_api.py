@@ -1,6 +1,7 @@
+from datetime import datetime
 from time import sleep, perf_counter
 from typing import Generator
-from unittest import TestCase
+import unittest
 
 import api_functions
 import api_functions.api_responses_structure as data_responses
@@ -8,7 +9,7 @@ import api_functions.api_responses_structure as data_responses
 from settings import rapid_api_keys, regular_api_keys
 
 
-class APITests(TestCase):
+class APITests(unittest.TestCase):
     """
     test suite aimed to check API information retrieval
     """
@@ -20,11 +21,23 @@ class APITests(TestCase):
     def assertConformsDataResponse(self, response_structure: dict[str, type | dict], response_example):
         """use one of the definitions of response structure, and compare it with actual response of the query"""
         for key, type_ in response_structure.items():
-            if isinstance(type_, type):
+            print(key, type_, response_example[key])
+            if isinstance(type_, type):  # check the type of response
                 self.assertTrue(isinstance(response_example[key], type_))
             elif isinstance(type_, dict):  # a sub-structure in the response
-                for sub_key, sub_type in response_structure[key].items():  # data_responses.exchanges
+                for sub_key, sub_type in response_structure[key].items():
                     self.assertTrue(isinstance(response_example[key][sub_key], sub_type))
+            elif isinstance(type_, tuple):
+                if len(type_) == 2:
+                    # case of timestamp in structure - assert correctly reading timestamp, using
+                    # strptime format from second argument
+                    if isinstance(type_[0], datetime) and isinstance(type_[1], str):
+                        try:
+                            datetime.strptime(response_example[key], type_[1])
+                        except ValueError:
+                            raise AssertionError(
+                                'datetime is not the data type that is loaded through the function at key:', key
+                            )
 
     def test_key_switching_functionality(self):
         """
@@ -77,6 +90,7 @@ class APITests(TestCase):
             data_type='json',
             api_key_pair=api_key_pair_,
         )
+        print(api_response)
         self.assertIsNotNone(api_response['datetime'])
         self.assertIsNotNone(api_response['unix_time'])
 
@@ -92,7 +106,7 @@ class APITests(TestCase):
         sleep(8)  # wait to use keys for another test
 
     def test_get_all_exchanges(self):
-        """obtain a list of exchanges from the TwelveData"""
+        """obtain a list of exchanges from the TwelveData provider"""
         exchanges = api_functions.get_all_exchanges(next(APITests.key_switcher), data_type='json')
 
         # check the structure of the response according to the definition
@@ -100,7 +114,7 @@ class APITests(TestCase):
         self.assertConformsDataResponse(data_responses.exchanges, exchange_example)
 
     def test_get_all_equities(self):
-        """obtain list of tracked equities from """
+        """obtain list of tracked equities from the TwelveData provider"""
         equities = api_functions.get_all_equities(next(APITests.key_switcher), data_type='json')
 
         # check the structure of the response according to the definition
@@ -109,7 +123,7 @@ class APITests(TestCase):
         # print(len(['data']))
 
     def test_get_all_currency_pairs(self):
-        """obtain list of tracked equities from """
+        """obtain list of tracked equities from the TwelveData provider"""
         currency_pairs = api_functions.get_all_currency_pairs(next(APITests.key_switcher), data_type='json')
 
         # check the structure of the response according to the definition
@@ -117,4 +131,19 @@ class APITests(TestCase):
         print(currency_example)
         self.assertConformsDataResponse(data_responses.forex_pairs, currency_example)
 
+    def test_get_api_usage(self):
+        """obtain information about how many tokens have been used up already using regular API subscription"""
+        api_key = None
+        for i, k in enumerate(APITests.key_switcher):
+            if i > 2:
+                break
+            if "regular" in k[0]:
+                api_key = k
+            else:
+                continue
+        usage_info_response = api_functions.get_api_usage(api_key)
+        self.assertConformsDataResponse(data_responses.api_usage, usage_info_response)
 
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,5 +1,3 @@
-import psycopg2
-
 import settings
 
 
