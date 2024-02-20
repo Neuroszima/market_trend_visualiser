@@ -21,7 +21,7 @@ class APITests(unittest.TestCase):
     def assertConformsDataResponse(self, response_structure: dict[str, type | dict], response_example):
         """use one of the definitions of response structure, and compare it with actual response of the query"""
         for key, type_ in response_structure.items():
-            print(key, type_, response_example[key])
+            # print(key, type_, response_example[key])
             if isinstance(type_, type):  # check the type of response
                 self.assertTrue(isinstance(response_example[key], type_))
             elif isinstance(type_, dict):  # a sub-structure in the response
@@ -143,6 +143,21 @@ class APITests(unittest.TestCase):
                 continue
         usage_info_response = api_functions.get_api_usage(api_key)
         self.assertConformsDataResponse(data_responses.api_usage, usage_info_response)
+
+    def test_get_earliest_timestamp(self):
+        """obtain information about the earliest time series data point of a given ticker"""
+        ticker, market_code = "NVDA", "XNGS"
+        forex_pair = "USD/CAD"
+        time_intervals = ['1day', '1min']
+        for interval_ in time_intervals:
+            ticker_timestamp = api_functions.obtain_earliest_timestamp(
+                ticker, mic_code=market_code, time_interval=interval_, api_key_pair=next(APITests.key_switcher))
+
+            forex_timestamp = api_functions.obtain_earliest_timestamp(
+                forex_pair, time_interval=interval_, api_key_pair=next(APITests.key_switcher))
+            for tmstmp in [ticker_timestamp, forex_timestamp]:
+                self.assertConformsDataResponse(
+                    getattr(data_responses, f"earliest_timestamp_{interval_}"), tmstmp)
 
 
 if __name__ == '__main__':

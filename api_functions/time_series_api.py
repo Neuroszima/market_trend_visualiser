@@ -1,7 +1,8 @@
 from math import ceil
+from pprint import pprint
 from time import time, sleep
 from ast import literal_eval
-from datetime import datetime  # planned to use timedelta but not useful
+from datetime import datetime
 from typing import Literal
 
 from api_functions.miscellaneous_api import parse_get_response_, api_key_switcher_
@@ -13,12 +14,13 @@ TIMESTAMP = dict[Literal['datetime', 'unix_time'], [str, int]]
 @time_interval_sanitizer()
 def obtain_earliest_timestamp_(
         symbol: str, api_key_pair: tuple, mic_code: str = None, exchange: str = None,
-        time_interval: str = None, timezone: str = None) -> TIMESTAMP:
+        time_interval: str = None, timezone: str = None, ask_stock: bool = True) -> TIMESTAMP:
     """ask api for the earliest datapoint of certain ticker in their database"""
     if not time_interval:
         time_interval = "1min"
-    if not mic_code:
-        mic_code = "XNGS"
+    if ask_stock:
+        if not mic_code:
+            mic_code = "XNGS"
     querystring = {
         "interval": time_interval,
         "symbol": symbol,
@@ -137,23 +139,37 @@ def preprocess_dates_(start_date: datetime | None, end_date: datetime | None):
     return start_date, end_date
 
 
-def calculate_iterations_(first_historical_point: datetime, time_interval: str):
+def calculate_iterations_(
+        first_historical_point: datetime, time_interval: str,
+        end_date: datetime | None = None, ask_stock: bool = True):
     """
     calculate how many trading days are there to download and then obtain number of iterations to get all of them
     number of downloads is overestimated on purpose
+
+    since stock market has opening and close hours, we need different method to calculate iterations
+    for forex market tickers
     """
-    current_date = datetime.now()
-    diff = current_date - first_historical_point
-    days = (diff.days + 1) * 0.74  # a bit more than 5/7 days in a week
+    if not end_date:
+        end_date = datetime.now()
+    diff = end_date - first_historical_point
+    days = (diff.days + 1) * 0.76  # a bit more than 5/7 days in a week
+
     if time_interval == '1day':
         return ceil(days / 4999) + 1
-    elif time_interval == '1min':
-        return ceil(days * 390 / 4999) + 1
+
+    # following branching will support more time intervals if future improvements will demand so, that's why
+    # it looks goofy for now
+    if ask_stock:
+        if time_interval == '1min':
+            return ceil(days * 390 / 4999) + 1
+    else:
+        if time_interval == "1min":
+            return ceil(days * 1440 / 4999) + 1
     raise ValueError('time interval not suitable for calculating iterations')
 
 
 @time_interval_sanitizer()
-def download_equity_history_(
+def download_market_ticker_history_(
         symbol: str, api_key_permission_list: list | None = None, time_interval=None, mic_code=None,
         exchange=None, currency=None, verbose=False, start_date: datetime = None, end_date: datetime = None):
     """
@@ -170,12 +186,15 @@ def download_equity_history_(
 
     if not time_interval:
         time_interval = "1min"
-    if not mic_code:
-        mic_code = "XNGS"
-    if not exchange:
-        exchange = "NASDAQ"
-    if not currency:
-        currency = "USD"
+
+    ask_stock = "/" not in symbol
+    if (ask_stock):  # asking for stock information, otherwise asking for forex pair
+        if not mic_code:
+            mic_code = "XNGS"
+        if not exchange:
+            exchange = "NASDAQ"
+        if not currency:
+            currency = "USD"
 
     # no more need for sleep of 8 seconds and calculations. Simply invoke "next(key_switcher)" to get the
     # delay calculated automatically
@@ -215,7 +234,10 @@ def download_equity_history_(
     if start_date:
         download_params['start_date'] = start_date
 
-    iterations = calculate_iterations_(first_historical_point, time_interval=time_interval)
+    iterations = calculate_iterations_(
+        first_historical_point, time_interval=time_interval,
+        end_date=end_date, ask_stock=ask_stock)
+    print(iterations)
     for j in range(iterations):
         partial_data: dict = download_time_series_(**download_params, api_key_pair=next(key_switcher))
 
@@ -274,23 +296,22 @@ def download_equity_history_(
 
 if __name__ == '__main__':
     stock = "NVDA"
-    # key_switcher_ = api_key_switcher_(['regular1', ...
-    # t = obtain_earliest_timestamp_(stock, mic_code="XNGS", time_interval='1min', api_key_pair=next(key_switcher_))
-    # print(calculate_iterations_(datetime.strptime(t['datetime'], '%Y-%m-%d %H:%M:%S'), "1min"))
-    # t2 = obtain_earliest_timestamp_(stock, mic_code="XNGS", time_interval='1day', api_key_pair=next(key_switcher_))
-    # print(calculate_iterations_(datetime.strptime(t2['datetime'], '%Y-%m-%d'), "1day"))
+    f_pair = "USD/CAD"
+    key_switcher_ = api_key_switcher_(['regular1', 'rapid1'])
 
-    time_series = download_equity_history_(
-        symbol=stock,
-        start_date=datetime(year=2022, month=4, day=20),
-        end_date=datetime(year=2022, month=7, day=20),
-        # api_key_permission_list=['regular1', ...
-        # if left empty, every key will be used and switched between
-    )
+    # time_series = download_market_ticker_history_(
+    #     symbol=f_pair,
+    #     start_date=datetime(year=2022, month=4, day=20),
+    #     end_date=datetime(year=2022, month=7, day=20),
+    #     time_interval="1day",
+    #     api_key_permission_list=['regular1', ...
+    #     if left empty, every key will be used and switched between
+    # )
 
-    print(len(time_series))
-    print(time_series[0])
-    print(time_series[-1])
-    print()
-    print(time_series[4997:5003])  # see if there is no holes on the joint of 2 queries
+    # print(len(time_series))
+    # pprint([o['datetime'] for o in time_series])
+    # print(time_series[0])
+    # print(time_series[-1])
+    # print()
+    # print(time_series[4997:5003])  # see if there is no holes on the joint of 2 queries
 

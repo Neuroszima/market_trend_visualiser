@@ -76,6 +76,11 @@ earliest_timestamp_1day = {
     'unix_time': int
 }
 
+earliest_timestamp_1min = {
+    'datetime': (datetime, "%Y-%m-%d %H:%M:%S"),
+    'unix_time': int
+}
+
 exchange_rate = {
 
 }
