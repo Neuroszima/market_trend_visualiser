@@ -54,6 +54,15 @@ time_series_1min = {
     'volume': int
 }
 
+time_series_1min_forex = {
+    'datetime': (datetime, "%Y-%m-%d %H:%M:%S"),
+    'high': float,
+    'low': float,
+    'open': float,
+    'close': float,
+}
+
+
 time_series_1day = {
     'datetime': (datetime, "%Y-%m-%d"),
     'high': float,
@@ -61,6 +70,14 @@ time_series_1day = {
     'open': float,
     'close': float,
     'volume': int
+}
+
+time_series_1day_forex = {
+    'datetime': (datetime, "%Y-%m-%d"),
+    'high': float,
+    'low': float,
+    'open': float,
+    'close': float,
 }
 
 api_usage = {

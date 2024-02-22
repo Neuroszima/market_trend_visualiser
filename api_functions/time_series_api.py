@@ -3,7 +3,7 @@ from pprint import pprint
 from time import time, sleep
 from ast import literal_eval
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Generator
 
 from api_functions.miscellaneous_api import parse_get_response_, api_key_switcher_
 from minor_modules import time_interval_sanitizer
@@ -170,7 +170,7 @@ def calculate_iterations_(
 
 @time_interval_sanitizer()
 def download_market_ticker_history_(
-        symbol: str, api_key_permission_list: list | None = None, time_interval=None, mic_code=None,
+        symbol: str, key_switcher: Generator, time_interval=None, mic_code=None,
         exchange=None, currency=None, verbose=False, start_date: datetime = None, end_date: datetime = None):
     """
     Automates the process of downloading entire history of the index, from the TwelveData provider
@@ -179,16 +179,26 @@ def download_market_ticker_history_(
     full history is downloaded when no timestamp is passed in the function body.
 
     this method, internally, downloads data only in json format
+
+    :param symbol: ticker symbol from the exchange
+    :param key_switcher: generator object made from designated function form api_functions module
+    :param time_interval: default "1min", time distance between datapoints
+    :param exchange: default "NASDAQ", if not asking for currency pair
+    :param mic_code: more precise version of 'exchange', default "XNGS" when not passed in
+    :param currency: currency required to buy traded ticker, default USD when not passed in
+    :param start_date: historically the farthest point of interest, default to "earliest timestamp" if not passed
+    :param end_date: historically the latest point of interest, default 'today' if not passed
+    :param verbose: print information about download progress
+
     """
 
     start_date, end_date = preprocess_dates_(start_date, end_date)
-    key_switcher = api_key_switcher_(permitted_keys=api_key_permission_list)
 
     if not time_interval:
         time_interval = "1min"
 
-    ask_stock = "/" not in symbol
-    if (ask_stock):  # asking for stock information, otherwise asking for forex pair
+    ask_equity = "/" not in symbol
+    if ask_equity:  # asking for equity information, otherwise asking for forex pair
         if not mic_code:
             mic_code = "XNGS"
         if not exchange:
@@ -229,15 +239,13 @@ def download_market_ticker_history_(
         "currency": currency,
         # date params make it inefficient in terms of obtainable 5k data points per query
         "end_date": end_date,
-        # "start_date": first_historical_point
     }
     if start_date:
         download_params['start_date'] = start_date
 
     iterations = calculate_iterations_(
         first_historical_point, time_interval=time_interval,
-        end_date=end_date, ask_stock=ask_stock)
-    print(iterations)
+        end_date=end_date, ask_stock=ask_equity)
     for j in range(iterations):
         partial_data: dict = download_time_series_(**download_params, api_key_pair=next(key_switcher))
 
@@ -292,26 +300,4 @@ def download_market_ticker_history_(
 
     # print(len(full_time_series))
     return full_time_series
-
-
-if __name__ == '__main__':
-    stock = "NVDA"
-    f_pair = "USD/CAD"
-    key_switcher_ = api_key_switcher_(['regular1', 'rapid1'])
-
-    # time_series = download_market_ticker_history_(
-    #     symbol=f_pair,
-    #     start_date=datetime(year=2022, month=4, day=20),
-    #     end_date=datetime(year=2022, month=7, day=20),
-    #     time_interval="1day",
-    #     api_key_permission_list=['regular1', ...
-    #     if left empty, every key will be used and switched between
-    # )
-
-    # print(len(time_series))
-    # pprint([o['datetime'] for o in time_series])
-    # print(time_series[0])
-    # print(time_series[-1])
-    # print()
-    # print(time_series[4997:5003])  # see if there is no holes on the joint of 2 queries
 

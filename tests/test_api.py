@@ -18,7 +18,11 @@ class APITests(unittest.TestCase):
     key_switcher: Generator = api_functions.api_key_switcher(["regular0", "rapid0"])
 
     def setUp(self) -> None:
-        pass
+        self.start = datetime.strptime("2022-03-22 11:20", "%Y-%m-%d %H:%M")
+        self.end = datetime.strptime("2022-03-25 10:20", "%Y-%m-%d %H:%M")
+        self.start_far_date = datetime.strptime("2022-03-22 11:20", "%Y-%m-%d %H:%M")
+        self.end_far_date = datetime.strptime("2022-05-25 10:20", "%Y-%m-%d %H:%M")
+        self.diff = self.end - self.start
 
     def assertExactSameKeysInDict(self, dict_a: dict, dict_b: dict):
         """check if dicts has exactly the same keys"""
@@ -33,10 +37,18 @@ class APITests(unittest.TestCase):
         """use one of the definitions of response structure, and compare it with actual response of the query"""
         # check if there are EXACTLY the keys required for this response and nothing else
         self.assertExactSameKeysInDict(response_structure, response_example)
+
+        # then, check value that falls under each key
         for key, type_ in response_structure.items():
-            # print(key, type_, response_example[key])
             if isinstance(type_, type):  # check the type of response
-                self.assertTrue(isinstance(response_example[key], type_))
+                if type_ in [float, int]:
+                    try:
+                        type_(response_example[key])
+                    except ValueError:
+                        raise AssertionError(f"argument cannot be cast into {type_}")
+                else:
+                    self.assertTrue(isinstance(response_example[key], type_),
+                                    msg=f"{type(response_example[key])}, {type_}, {key=}")
             elif isinstance(type_, dict):  # a sub-structure in the response
                 self.assertExactSameKeysInDict(type_, response_structure[key])
                 for sub_key, sub_type in response_structure[key].items():
@@ -251,16 +263,12 @@ class APITests(unittest.TestCase):
         and check correctness of data obtained
         """
         # following downloads should end with <5000 points
-        start = datetime.strptime("2022-03-22 11:20", "%Y-%m-%d %H:%M")
-        end = datetime.strptime("2022-03-25 10:20", "%Y-%m-%d %H:%M")
-        start_daily = datetime.strptime("2022-03-22 11:20", "%Y-%m-%d %H:%M")
-        end_daily = datetime.strptime("2022-05-25 10:20", "%Y-%m-%d %H:%M")
         series_example = api_functions.download_time_series(
             symbol="NVDA",
             api_key_pair=next(APITests.key_switcher),
             mic_code="XNGS",
-            start_date=start,
-            end_date=end,
+            start_date=self.start,
+            end_date=self.end,
             time_interval='1min'
         )
         self.assertConformsDataResponse(data_responses.equity_time_series_download_response, series_example)
@@ -269,12 +277,11 @@ class APITests(unittest.TestCase):
         series_example2 = api_functions.download_time_series(
             symbol="USD/CAD",
             api_key_pair=next(APITests.key_switcher),
-            start_date=start,
-            end_date=end,
+            start_date=self.start,
+            end_date=self.end,
             time_interval="1min"
         )
-        diff = (end - start)
-        assumed_datapoints_output = (diff.days * 24 * 60 + diff.seconds / 60) + 1
+        assumed_datapoints_output = (self.diff.days * 24 * 60 + self.diff.seconds / 60) + 1
         self.assertConformsDataResponse(data_responses.forex_time_series_download_response, series_example2)
         # we cannot determine the real output of the database for 1 minute case in FX. There are
         # holes in data for 1 minute or so, and then those result in less then usual datapoints
@@ -283,13 +290,17 @@ class APITests(unittest.TestCase):
             assumed_datapoints_output,
             assumed_datapoints_output*0.9
         )
+        for p in series_example['values']:
+            self.assertConformsDataResponse(data_responses.time_series_1min, p)
+        for p in series_example2['values']:
+            self.assertConformsDataResponse(data_responses.time_series_1min_forex, p)
 
         series_daily = api_functions.download_time_series(
             symbol="NVDA",
             api_key_pair=next(APITests.key_switcher),
             mic_code="XNGS",
-            start_date=start_daily,
-            end_date=end_daily,
+            start_date=self.start_far_date,
+            end_date=self.end_far_date,
             time_interval='1day'
         )
         self.assertConformsDataResponse(data_responses.equity_time_series_download_response, series_daily)
@@ -298,12 +309,55 @@ class APITests(unittest.TestCase):
         series_daily2 = api_functions.download_time_series(
             symbol="USD/CAD",
             api_key_pair=next(APITests.key_switcher),
-            start_date=start_daily,
-            end_date=end_daily,
+            start_date=self.start_far_date,
+            end_date=self.end_far_date,
             time_interval="1day"
         )
         self.assertConformsDataResponse(data_responses.forex_time_series_download_response, series_daily2)
         self.assertEqual(len(series_daily2['values']), 46)
+
+        for p in series_example['values']:
+            self.assertConformsDataResponse(data_responses.time_series_1day, p)
+        for p in series_example2['values']:
+            self.assertConformsDataResponse(data_responses.time_series_1day_forex, p)
+
+    def test_equity_history_download(self):
+        """
+        test downloading data since arbitrary date up to arbitrary date, of currency pair or equity ticker
+        most of the crucial functionality
+        """
+
+        cases = [
+            ("USD/CAD", None, "1day", 46),
+            ("AAPL", "XNGS", "1day", 45),
+            ("USD/CAD", None, "1min", 66151),
+            ("AAPL", "XNGS", "1min", 17475)
+        ]
+        # regular download - without the need to iterate over
+        for symbol, code, interval_, series_length in cases:
+            time_series = api_functions.download_market_ticker_history(
+                symbol=symbol,
+                mic_code=code,
+                key_switcher=APITests.key_switcher,
+                start_date=self.start_far_date,
+                end_date=self.end_far_date,
+                time_interval=interval_,
+            )
+            self.assertEqual(len(time_series), series_length)
+            response_name = f"time_series_{interval_}_forex" if "/" in symbol else \
+                f"time_series_{interval_}"
+            self.assertConformsDataResponse(
+                getattr(data_responses, response_name),
+                time_series[0]
+            )
+            if interval_ == "1min":
+                last = datetime.strptime(time_series[4999]['datetime'], "%Y-%m-%d %H:%M:%S")
+                mid = datetime.strptime(time_series[5000]['datetime'], "%Y-%m-%d %H:%M:%S")
+                prev = datetime.strptime(time_series[5001]['datetime'], "%Y-%m-%d %H:%M:%S")
+                diff1 = (mid - prev).seconds
+                diff2 = (last - mid).seconds
+                self.assertEqual(diff1, 60)
+                self.assertEqual(diff2, 60)
 
 
 if __name__ == '__main__':
