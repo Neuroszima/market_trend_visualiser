@@ -75,6 +75,8 @@ key permission lists that prevent quick token depletion, on the other enabling b
 
 :heavy_check_mark: extend saving time series to forex data (additional schema and modification to download functions)
 
+:heavy_minus_sign: tests to check correctness of most if not all api and db related functions
+
 :heavy_minus_sign: prepare automatic creation script for creating a fresh database, which is initially 
 populated with a couple preselected stocks (kind of like "demo mode")
 

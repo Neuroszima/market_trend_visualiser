@@ -84,3 +84,29 @@ earliest_timestamp_1min = {
 exchange_rate = {
 
 }
+
+equity_time_series_download_response = {
+    'meta': {
+        'currency': str,
+        'exchange': str,
+        'exchange_timezone': str,
+        'interval': str,
+        'mic_code': str,
+        'symbol': str,
+        'type': str
+    },
+    'status': str,
+    'values': list
+}
+
+forex_time_series_download_response = {
+    'meta': {
+        'currency_base': str,
+        'currency_quote': str,
+        'interval': str,
+        'symbol': str,
+        'type': str,
+    },
+    'status': str,
+    'values': list
+}

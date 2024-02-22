@@ -145,8 +145,12 @@ class DBTests(unittest.TestCase):
         for e in sample_data:
             equity_types.update((str(e['type']),))
 
-        db_functions.insert_investment_types(equity_types)
-        db_functions.insert_stocks(sample_data)
+        try:
+            db_functions.insert_investment_types(equity_types)
+            db_functions.insert_stocks(sample_data)
+        except psycopg2.Error as e:
+            print(e)
+            raise AssertionError("database error raised on proper insertion")
 
     def test_obtain_latest_timestamp_from_db(self):
         """obtain latest timestamp from certain timetable, for table update purpose"""

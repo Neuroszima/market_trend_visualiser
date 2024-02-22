@@ -9,7 +9,7 @@ class time_interval_sanitizer_:
 
     def __call__(self, function: Callable):
         def function_wrapper(*args, **kwargs):
-            print(args, kwargs)
+            # print(args, kwargs)
             # arg check, and following kwarg check if arg does not find anything
             if "time_interval" not in kwargs:  # special case of download functions, they have automated substitution
                 if function.__name__ in [

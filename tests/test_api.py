@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from math import ceil
+from pprint import pprint
 from time import sleep, perf_counter
 from typing import Generator
 import unittest
@@ -18,13 +20,25 @@ class APITests(unittest.TestCase):
     def setUp(self) -> None:
         pass
 
-    def assertConformsDataResponse(self, response_structure: dict[str, type | dict], response_example):
+    def assertExactSameKeysInDict(self, dict_a: dict, dict_b: dict):
+        """check if dicts has exactly the same keys"""
+        if not isinstance(dict_b, dict):
+            raise ValueError("dict_b, not a dict")
+        if not isinstance(dict_a, dict):
+            raise TypeError("dict_a, not a dict")
+        # comparing sets do not check the order, just if keys exist
+        self.assertEqual(set([k for k, v in dict_a.items()]), set([k for k, v in dict_b.items()]))
+
+    def assertConformsDataResponse(self, response_structure: dict[str, type | dict], response_example: dict):
         """use one of the definitions of response structure, and compare it with actual response of the query"""
+        # check if there are EXACTLY the keys required for this response and nothing else
+        self.assertExactSameKeysInDict(response_structure, response_example)
         for key, type_ in response_structure.items():
             # print(key, type_, response_example[key])
             if isinstance(type_, type):  # check the type of response
                 self.assertTrue(isinstance(response_example[key], type_))
             elif isinstance(type_, dict):  # a sub-structure in the response
+                self.assertExactSameKeysInDict(type_, response_structure[key])
                 for sub_key, sub_type in response_structure[key].items():
                     self.assertTrue(isinstance(response_example[key][sub_key], sub_type))
             elif isinstance(type_, tuple):
@@ -38,6 +52,10 @@ class APITests(unittest.TestCase):
                             raise AssertionError(
                                 'datetime is not the data type that is loaded through the function at key:', key
                             )
+
+    def assertInRangeInclusive(self, value, max, min):
+        """assert value is within the range that includes values """
+        assert min <= value <= max
 
     def test_key_switching_functionality(self):
         """
@@ -74,8 +92,8 @@ class APITests(unittest.TestCase):
         meaning if responses from TwelveData API and Rapid are processed correctly
         """
         # 2 possible endpoints used to form key tuples
-        api_key_pair_ = ('rapid0', rapid_api_keys['rapid0'])
-        api_key_pair_2 = ('regular0', regular_api_keys['regular0'])
+        rapid_pair = ('rapid0', rapid_api_keys['rapid0'])
+        regular_pair = ('regular0', regular_api_keys['regular0'])
 
         querystring = {
             "symbol": "NVDA",
@@ -88,7 +106,7 @@ class APITests(unittest.TestCase):
             querystring,
             request_type='earliest_timestamp',
             data_type='json',
-            api_key_pair=api_key_pair_,
+            api_key_pair=rapid_pair,
         )
         print(api_response)
         self.assertIsNotNone(api_response['datetime'])
@@ -99,7 +117,7 @@ class APITests(unittest.TestCase):
             querystring,
             request_type='earliest_timestamp',
             data_type='json',
-            api_key_pair=api_key_pair_2,
+            api_key_pair=regular_pair,
         )
         self.assertIsNotNone(api_response['datetime'])
         self.assertIsNotNone(api_response['unix_time'])
@@ -137,7 +155,7 @@ class APITests(unittest.TestCase):
         for i, k in enumerate(APITests.key_switcher):
             if i > 2:
                 break
-            if "regular" in k[0]:
+            if "regular" in k[0]:  # get the key that actually IS responsible with connecting to regular API
                 api_key = k
             else:
                 continue
@@ -158,6 +176,134 @@ class APITests(unittest.TestCase):
             for tmstmp in [ticker_timestamp, forex_timestamp]:
                 self.assertConformsDataResponse(
                     getattr(data_responses, f"earliest_timestamp_{interval_}"), tmstmp)
+
+    def test_day_interval(self):
+        """test pre-made with the help of ChatGPT"""
+        start_date = datetime(2020, 1, 1)
+        end_date = datetime(2020, 12, 31)
+        result = api_functions.calculate_iterations(start_date, '1day', end_date)
+        expected_days = (end_date - start_date).days + 1
+        expected_iterations = ceil((expected_days * 0.76) / 4999) + 1
+        self.assertEqual(result, expected_iterations)
+
+    def test_minute_interval_stocks(self):
+        """test pre-made with the help of ChatGPT"""
+        start_date = datetime(2020, 1, 1)
+        end_date = datetime(2020, 1, 2)
+        result = api_functions.calculate_iterations(start_date, '1min', end_date, ask_stock=True)
+        expected_days = (end_date - start_date).days + 1
+        expected_iterations = ceil((expected_days * 0.76 * 390) / 4999) + 1
+        self.assertEqual(result, expected_iterations)
+
+    def test_minute_interval_forex(self):
+        """test pre-made with the help of ChatGPT"""
+        start_date = datetime(2020, 1, 1)
+        end_date = datetime(2020, 1, 2)
+        result = api_functions.calculate_iterations(start_date, '1min', end_date, ask_stock=False)
+        # personal edit - only 1 day of difference - at most 2 iterations needed, best would be 1
+        # this is due to day having 1440 minutes and not needing more than 5k point download
+        expected_iterations = 2
+        self.assertEqual(result, expected_iterations)
+
+    def test_without_end_date(self):
+        """test pre-made with the help of ChatGPT"""
+        start_date = datetime.now() - timedelta(days=100)
+        result = api_functions.calculate_iterations(start_date, '1day')
+        # This test's expected value is hard to assert due to dependency on the current date
+        # but we can check if it does not raise an error and returns an int
+        self.assertIsInstance(result, int)
+
+    def test_invalid_time_interval(self):
+        """test pre-made with the help of ChatGPT"""
+        start_date = datetime(2020, 1, 1)
+        with self.assertRaises(ValueError):
+            api_functions.calculate_iterations(start_date, '7min')
+
+    def test_dates_within_session_times(self):
+        """test pre-made with the help of ChatGPT"""
+        start = datetime(2023, 1, 1, 10, 0)
+        end = datetime(2023, 1, 1, 15, 0)
+        self.assertEqual(api_functions.preprocess_dates(start, end), (start, end))
+
+    def test_dates_outside_session_times(self):
+        """test pre-made with the help of ChatGPT"""
+        start = datetime(2023, 1, 1, 8, 0)  # Before session open
+        end = datetime(2023, 1, 1, 16, 0)  # After session close
+        processed_start, processed_end = api_functions.preprocess_dates(start, end)
+        self.assertEqual(processed_start, datetime(2023, 1, 1, 9, 30))
+        self.assertEqual(processed_end, datetime(2023, 1, 1, 15, 59))
+
+    def test_none_inputs(self):
+        """test pre-made with the help of ChatGPT"""
+        self.assertEqual(api_functions.preprocess_dates(None, None), (None, None))
+
+    def test_mixed_dates(self):
+        """test pre-made with the help of ChatGPT"""
+        start = datetime(2023, 1, 1, 10, 0)  # Within session times
+        end = datetime(2023, 1, 1, 16, 0)  # After session close
+        processed_start, processed_end = api_functions.preprocess_dates(start, end)
+        self.assertEqual(processed_start, start)
+        self.assertEqual(processed_end, datetime(2023, 1, 1, 15, 59))
+
+    def test_download_time_series(self):
+        """
+        test aims to download a set amount of points for both currency pair and equity
+        and check correctness of data obtained
+        """
+        # following downloads should end with <5000 points
+        start = datetime.strptime("2022-03-22 11:20", "%Y-%m-%d %H:%M")
+        end = datetime.strptime("2022-03-25 10:20", "%Y-%m-%d %H:%M")
+        start_daily = datetime.strptime("2022-03-22 11:20", "%Y-%m-%d %H:%M")
+        end_daily = datetime.strptime("2022-05-25 10:20", "%Y-%m-%d %H:%M")
+        series_example = api_functions.download_time_series(
+            symbol="NVDA",
+            api_key_pair=next(APITests.key_switcher),
+            mic_code="XNGS",
+            start_date=start,
+            end_date=end,
+            time_interval='1min'
+        )
+        self.assertConformsDataResponse(data_responses.equity_time_series_download_response, series_example)
+        self.assertEqual(len(series_example['values']), 1111)
+
+        series_example2 = api_functions.download_time_series(
+            symbol="USD/CAD",
+            api_key_pair=next(APITests.key_switcher),
+            start_date=start,
+            end_date=end,
+            time_interval="1min"
+        )
+        diff = (end - start)
+        assumed_datapoints_output = (diff.days * 24 * 60 + diff.seconds / 60) + 1
+        self.assertConformsDataResponse(data_responses.forex_time_series_download_response, series_example2)
+        # we cannot determine the real output of the database for 1 minute case in FX. There are
+        # holes in data for 1 minute or so, and then those result in less then usual datapoints
+        self.assertInRangeInclusive(
+            len(series_example2['values']),
+            assumed_datapoints_output,
+            assumed_datapoints_output*0.9
+        )
+
+        series_daily = api_functions.download_time_series(
+            symbol="NVDA",
+            api_key_pair=next(APITests.key_switcher),
+            mic_code="XNGS",
+            start_date=start_daily,
+            end_date=end_daily,
+            time_interval='1day'
+        )
+        self.assertConformsDataResponse(data_responses.equity_time_series_download_response, series_daily)
+        self.assertEqual(len(series_daily['values']), 45)
+
+        series_daily2 = api_functions.download_time_series(
+            symbol="USD/CAD",
+            api_key_pair=next(APITests.key_switcher),
+            start_date=start_daily,
+            end_date=end_daily,
+            time_interval="1day"
+        )
+        self.assertConformsDataResponse(data_responses.forex_time_series_download_response, series_daily2)
+        self.assertEqual(len(series_daily2['values']), 46)
 
 
 if __name__ == '__main__':
