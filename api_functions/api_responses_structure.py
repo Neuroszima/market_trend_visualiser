@@ -1,6 +1,7 @@
 # all data types here only cover the "json to python" conversion
 # these do not contain data types used in actual database
 # for now these reflect types that should be obtained in certain API tests
+from copy import deepcopy
 from datetime import datetime
 
 
@@ -11,11 +12,14 @@ equities = {
     'exchange': str,
     'country': str,
     'type': str,
+    'mic_code': str,
     'access': {
         'global': str,
         'plan': str
     }
 }
+equities_no_plan = deepcopy(equities)
+del equities_no_plan['access']
 
 # this contains dict in dict
 exchanges = {

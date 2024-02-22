@@ -1,6 +1,8 @@
 # from pprint import pprint
+import json
 from time import perf_counter, sleep
-from typing import Literal, Optional, Generator
+from typing import Literal, Optional
+from contextlib import suppress
 
 from api_functions.API_URLS import *
 
@@ -11,8 +13,7 @@ JSON_RESPONSE = dict[Literal['data', 'status']]
 
 
 def parse_get_response_(
-        querystring_parameters: dict, api_key_pair: tuple, request_type: None | str = None,
-        data_type: None | str = None, ) -> dict | str:
+        querystring_parameters: dict, api_key_pair: tuple, data_type: str, request_type: str) -> dict | str:
     """
     prepare a request and parse response from selected API endpoint
 
@@ -34,11 +35,10 @@ def parse_get_response_(
             endpoint = LIST_OF_AVAILABLE_EXCHANGES
         case "list stocks":
             endpoint = LIST_OF_STOCKS_SYMBOLS
+        case "token_usage":
+            endpoint = API_USAGE_URL  # proper key usage is handled in specified function
         case _:
-            if "regular" in api_key_pair[0]:
-                endpoint = API_USAGE_URL
-            else:
-                raise ValueError(f"request type value is invalid: {request_type}")
+            raise ValueError(f"request type value is invalid: {request_type}")
 
     get_request = dict()
     if "rapid" in api_key_pair[0]:
@@ -53,15 +53,21 @@ def parse_get_response_(
     else:
         raise KeyError("no api provided to connect to, or wrong type of api passed as an argument")
 
+    querystring_parameters['format'] = "CSV" if data_type == 'csv' else "JSON"
     get_request['url'] = api + endpoint
     get_request["params"] = querystring_parameters
-    # pprint(get_request)
     response = requests.get(**get_request)
     match data_type:
         case "json":
-            result = response.json()
+            result: dict = response.json()
+            if result.get('code') == 404:
+                raise ConnectionError('Error with query:', result['message'])
         case "csv":
-            result = response.text
+            result: str = response.text
+            with suppress(ValueError):
+                r_ = json.loads(result)
+                if r_['code'] == 404:
+                    raise ConnectionError('Error with query:', r_['message'])
         case __:
             raise KeyError("data type must be either \'csv\' or \'json\'")
 
@@ -75,7 +81,7 @@ def get_api_usage_(api_key_pair: tuple):
     rapidAPI solution does not allow for getting daily api usage, only direct TwelveData supports it
     """
     if "regular" in api_key_pair[0]:
-        return parse_get_response_(dict(), data_type="json", api_key_pair=api_key_pair)
+        return parse_get_response_(dict(), request_type="token_usage", data_type="json", api_key_pair=api_key_pair)
     raise ValueError(f"API key with identifier {api_key_pair[0]} does not connect to direct TwelveData API")
 
 

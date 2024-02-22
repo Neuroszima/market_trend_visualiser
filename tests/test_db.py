@@ -249,7 +249,6 @@ class DBTests(unittest.TestCase):
         self.assertDatabaseHasRows(schema_name, table_name, 4)
         assert db_functions.time_series_table_exists(stock_, interval_, mic_code=market_identification_code_)
 
-
     def test_forex_time_series_save(self):
         """test if properly formatted dummy data will be saved into database"""
         symbol = "USD/CAD"

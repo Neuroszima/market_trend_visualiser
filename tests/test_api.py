@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from math import ceil
+from random import choices
 from time import sleep, perf_counter
 from typing import Generator
 import unittest
@@ -88,7 +89,6 @@ class APITests(unittest.TestCase):
         for i, k in enumerate(key_switcher):
             if i >= len(key_list):
                 end = perf_counter()
-                print("time of key serving cycle:", end-start)
                 self.assertGreater(
                     end - start, 7.75, "time gap between cycles of serving keys is too small which "
                                        "might cause problems with too frequent querrying")
@@ -108,7 +108,7 @@ class APITests(unittest.TestCase):
 
         querystring = {
             "symbol": "NVDA",
-            "mic": "XNGS",
+            "mic_code": "XNGS",
             "interval": "1min",
         }
 
@@ -119,7 +119,6 @@ class APITests(unittest.TestCase):
             data_type='json',
             api_key_pair=rapid_pair,
         )
-        print(api_response)
         self.assertIsNotNone(api_response['datetime'])
         self.assertIsNotNone(api_response['unix_time'])
 
@@ -133,6 +132,42 @@ class APITests(unittest.TestCase):
         self.assertIsNotNone(api_response['datetime'])
         self.assertIsNotNone(api_response['unix_time'])
         sleep(8)  # wait to use keys for another test
+
+    def test_api_error(self):
+        querystring_bad_mic = {
+            "symbol": "APLE",
+            "mic_code": "XNGS",  # XNYS is proper for APLE (REIT! not Apple -> AAPL)
+            "interval": "1min",
+        }
+        with self.assertRaises(ConnectionError):
+            _ = api_functions.parse_get_response(
+                querystring_parameters=querystring_bad_mic,
+                request_type='time_series',
+                data_type='json',
+                api_key_pair=next(APITests.key_switcher),
+            )
+
+        with self.assertRaises(ConnectionError):
+            _ = api_functions.parse_get_response(
+                querystring_parameters=querystring_bad_mic,
+                request_type='time_series',
+                data_type='csv',
+                api_key_pair=next(APITests.key_switcher),
+            )
+
+        good_querystring = {
+            "symbol": "NVDA",
+            "mic_code": "XNGS",
+            "interval": "1min",
+        }
+        bad_request = "".join(choices(['a', 'o', "n", "x", "s", "q"], k=5))
+        with self.assertRaises(ValueError):
+            _ = api_functions.parse_get_response(
+                querystring_parameters=good_querystring,
+                request_type=bad_request,
+                data_type='json',
+                api_key_pair=next(APITests.key_switcher),
+            )
 
     def test_get_all_exchanges(self):
         """obtain a list of exchanges from the TwelveData provider"""
@@ -148,8 +183,15 @@ class APITests(unittest.TestCase):
 
         # check the structure of the response according to the definition
         equity_example = equities[0]
+        print(equities[0])
         self.assertConformsDataResponse(data_responses.equities, equity_example)
-        # print(len(['data']))
+
+        # additional parameter - show_plans -> additional 'access' entry
+        equities_no_plans = api_functions.get_all_equities(
+            next(APITests.key_switcher), data_type='json', additional_params={'show_plan': False})
+        eq_example_ = equities_no_plans[0]
+        self.assertConformsDataResponse(data_responses.equities, eq_example_)
+
 
     def test_get_all_currency_pairs(self):
         """obtain list of tracked equities from the TwelveData provider"""
@@ -157,20 +199,23 @@ class APITests(unittest.TestCase):
 
         # check the structure of the response according to the definition
         currency_example = currency_pairs[0]
-        print(currency_example)
         self.assertConformsDataResponse(data_responses.forex_pairs, currency_example)
 
     def test_get_api_usage(self):
         """obtain information about how many tokens have been used up already using regular API subscription"""
         api_key = None
+        improper_key = None
         for i, k in enumerate(APITests.key_switcher):
             if i > 2:
                 break
             if "regular" in k[0]:  # get the key that actually IS responsible with connecting to regular API
                 api_key = k
             else:
+                improper_key = k
                 continue
         usage_info_response = api_functions.get_api_usage(api_key)
+        with self.assertRaises(ValueError):
+            api_functions.get_api_usage(improper_key)
         self.assertConformsDataResponse(data_responses.api_usage, usage_info_response)
 
     def test_get_earliest_timestamp(self):
