@@ -2,7 +2,7 @@ import unittest
 
 import psycopg2
 
-from db_functions.db_helpers import _connection_dict
+from db_functions.db_helpers import _connection_dict, _table_rows_quantity
 from db_functions.time_series_db import _drop_time_table, _drop_forex_table
 import db_functions
 
@@ -12,6 +12,13 @@ class DBTests(unittest.TestCase):
     def setUp(self) -> None:
         db_functions.purge_db_structure()
         db_functions.import_db_structure()
+
+    def assertDatabaseHasRows(self, schema_name, table_name, correct_num_of_rows):
+        with psycopg2.connect(**_connection_dict) as conn:
+            cur = conn.cursor()
+            cur.execute(_table_rows_quantity.format(schema=schema_name, table_name=table_name))
+            result = cur.fetchall()
+            self.assertEqual(result[0][0], correct_num_of_rows)
 
     def save_forex_sample(self):
         """
@@ -158,14 +165,6 @@ class DBTests(unittest.TestCase):
         stock_, market_identification_code_ = "OTEX", "XNGS"
         interval_ = "1min"
 
-        # clean for this mini-test
-        with psycopg2.connect(**_connection_dict) as conn:
-            cur_ = conn.cursor()
-            cur_.execute(_drop_time_table.format(
-                time_interval=interval_,
-                symbol=stock_,
-                market_identification_code=market_identification_code_
-            ))
         db_functions.create_time_series(
             symbol=stock_, mic_code=market_identification_code_, time_interval=interval_)
 
@@ -212,17 +211,11 @@ class DBTests(unittest.TestCase):
             symbol, interval_, is_equity=False))
 
     def test_equity_time_series_save(self):
+        """test if properly formatted dummy data will be saved into database"""
         stock_, market_identification_code_ = "OTEX", "XNGS"
         interval_ = "1min"
+        schema_name = f"{interval_}_time_series"
 
-        # clean for this mini-test
-        with psycopg2.connect(**_connection_dict) as conn:
-            cur_ = conn.cursor()
-            cur_.execute(_drop_time_table.format(
-                time_interval=interval_,
-                symbol=stock_,
-                market_identification_code=market_identification_code_
-            ))
         db_functions.create_time_series(
             symbol=stock_, mic_code=market_identification_code_, time_interval=interval_)
 
@@ -230,7 +223,7 @@ class DBTests(unittest.TestCase):
         historical_dummy_data = [
             {
                 "index": 2, "equity_symbol": stock_,
-                "time_series_schema": f'"{interval_}_time_series"',
+                "time_series_schema": f'"{schema_name}"',
                 "market_identification_code": market_identification_code_,
                 "datetime": f"'2020-03-24 09:37:00'",
                 "open": 3, "close": 5, "high": 8, "low": 1.50,
@@ -238,7 +231,7 @@ class DBTests(unittest.TestCase):
             },
             {
                 "index": 1, "equity_symbol": stock_,
-                "time_series_schema": f'"{interval_}_time_series"',
+                "time_series_schema": f'"{schema_name}"',
                 "market_identification_code": market_identification_code_,
                 "datetime": f"'2020-03-24 09:36:00'",
                 "open": 1, "close": 3, "high": 4, "low": 0.50,
@@ -252,31 +245,16 @@ class DBTests(unittest.TestCase):
             historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_,
             rownum_start=2,
         )
-
+        table_name = stock_ + "_" + market_identification_code_
+        self.assertDatabaseHasRows(schema_name, table_name, 4)
         assert db_functions.time_series_table_exists(stock_, interval_, mic_code=market_identification_code_)
 
-        # restore for other mini-tests
-        with psycopg2.connect(**_connection_dict) as conn:
-            cur_ = conn.cursor()
-            cur_.execute(_drop_time_table.format(
-                time_interval=interval_,
-                symbol=stock_,
-                market_identification_code=market_identification_code_
-            ))
-        db_functions.create_time_series(
-            symbol=stock_, mic_code=market_identification_code_, time_interval=interval_)
 
     def test_forex_time_series_save(self):
+        """test if properly formatted dummy data will be saved into database"""
         symbol = "USD/CAD"
         interval_ = "1min"
 
-        # clean for this mini-test
-        with psycopg2.connect(**_connection_dict) as conn:
-            cur_ = conn.cursor()
-            cur_.execute(_drop_forex_table.format(
-                time_interval=interval_,
-                symbol=symbol,
-            ))
         db_functions.create_time_series(symbol=symbol, time_interval=interval_, is_equity=False)
 
         # populate table with dummy data
@@ -299,20 +277,9 @@ class DBTests(unittest.TestCase):
         db_functions.insert_equity_historical_data(
             historical_dummy_data, symbol=symbol, time_interval=interval_, rownum_start=2, is_equity=False
         )
-
+        table_ = "_".join(symbol.split("/")).upper() + f"_{interval_}"
+        self.assertDatabaseHasRows("forex_time_series", table_, 4)
         assert db_functions.time_series_table_exists(symbol, interval_, is_equity=False)
-        t = db_functions.time_series_latest_timestamp(symbol, interval_, is_equity=False)
-        print(t)
-        print(type(t))
-
-        # restore for other mini-tests
-        with psycopg2.connect(**_connection_dict) as conn:
-            cur_ = conn.cursor()
-            cur_.execute(_drop_forex_table.format(
-                time_interval=interval_,
-                symbol=symbol,
-            ))
-        db_functions.create_time_series(symbol=symbol, time_interval=interval_, is_equity=False)
 
 
 if __name__ == '__main__':

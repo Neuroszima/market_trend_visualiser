@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from math import ceil
-from pprint import pprint
 from time import sleep, perf_counter
 from typing import Generator
 import unittest
@@ -65,9 +64,9 @@ class APITests(unittest.TestCase):
                                 'datetime is not the data type that is loaded through the function at key:', key
                             )
 
-    def assertInRangeInclusive(self, value, max, min):
+    def assertInRangeInclusive(self, value, max_, min_):
         """assert value is within the range that includes values """
-        assert min <= value <= max
+        assert min_ <= value <= max_
 
     def test_key_switching_functionality(self):
         """

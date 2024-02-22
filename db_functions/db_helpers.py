@@ -4,6 +4,7 @@ import settings
 # helper queries
 _information_schema = "select * from information_schema.\"tables\" where table_schema LIKE 'public';"
 _information_schema2 = "select * from information_schema.\"columns\" where table_schema LIKE 'public';"
+_table_rows_quantity = "select count(*) from \"{schema}\".\"{table_name}\";"
 
 # select table_name from information_schema.\"tables\" where table_name = {table_name}
 _information_schema_time_series_check = """
