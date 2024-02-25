@@ -192,7 +192,6 @@ class APITests(unittest.TestCase):
         eq_example_ = equities_no_plans[0]
         self.assertConformsDataResponse(data_responses.equities, eq_example_)
 
-
     def test_get_all_currency_pairs(self):
         """obtain list of tracked equities from the TwelveData provider"""
         currency_pairs = api_functions.get_all_currency_pairs(next(APITests.key_switcher), data_type='json')
@@ -233,7 +232,7 @@ class APITests(unittest.TestCase):
                 self.assertConformsDataResponse(
                     getattr(data_responses, f"earliest_timestamp_{interval_}"), tmstmp)
 
-    def test_day_interval(self):
+    def test_iterations_day_interval(self):
         """test pre-made with the help of ChatGPT"""
         start_date = datetime(2020, 1, 1)
         end_date = datetime(2020, 12, 31)
@@ -242,7 +241,7 @@ class APITests(unittest.TestCase):
         expected_iterations = ceil((expected_days * 0.76) / 4999) + 1
         self.assertEqual(result, expected_iterations)
 
-    def test_minute_interval_stocks(self):
+    def test_iterations_minute_interval_stocks(self):
         """test pre-made with the help of ChatGPT"""
         start_date = datetime(2020, 1, 1)
         end_date = datetime(2020, 1, 2)
@@ -251,7 +250,7 @@ class APITests(unittest.TestCase):
         expected_iterations = ceil((expected_days * 0.76 * 390) / 4999) + 1
         self.assertEqual(result, expected_iterations)
 
-    def test_minute_interval_forex(self):
+    def test_iterations_minute_interval_forex(self):
         """test pre-made with the help of ChatGPT"""
         start_date = datetime(2020, 1, 1)
         end_date = datetime(2020, 1, 2)
@@ -261,7 +260,7 @@ class APITests(unittest.TestCase):
         expected_iterations = 2
         self.assertEqual(result, expected_iterations)
 
-    def test_without_end_date(self):
+    def test_iterations_without_end_date(self):
         """test pre-made with the help of ChatGPT"""
         start_date = datetime.now() - timedelta(days=100)
         result = api_functions.calculate_iterations(start_date, '1day')
@@ -269,7 +268,7 @@ class APITests(unittest.TestCase):
         # but we can check if it does not raise an error and returns an int
         self.assertIsInstance(result, int)
 
-    def test_invalid_time_interval(self):
+    def test_iterations_invalid_time_interval(self):
         """test pre-made with the help of ChatGPT"""
         start_date = datetime(2020, 1, 1)
         with self.assertRaises(ValueError):
@@ -289,11 +288,11 @@ class APITests(unittest.TestCase):
         self.assertEqual(processed_start, datetime(2023, 1, 1, 9, 30))
         self.assertEqual(processed_end, datetime(2023, 1, 1, 15, 59))
 
-    def test_none_inputs(self):
+    def test_dates_none_inputs(self):
         """test pre-made with the help of ChatGPT"""
         self.assertEqual(api_functions.preprocess_dates(None, None), (None, None))
 
-    def test_mixed_dates(self):
+    def test_dates_mixed(self):
         """test pre-made with the help of ChatGPT"""
         start = datetime(2023, 1, 1, 10, 0)  # Within session times
         end = datetime(2023, 1, 1, 16, 0)  # After session close
@@ -395,6 +394,8 @@ class APITests(unittest.TestCase):
                 time_series[0]
             )
             if interval_ == "1min":
+                # check if the joint of two queries do not have a gap between 4999-5001
+                # e.g. if there is nothing weird happening with dates of consecutive datapoints
                 last = datetime.strptime(time_series[4999]['datetime'], "%Y-%m-%d %H:%M:%S")
                 mid = datetime.strptime(time_series[5000]['datetime'], "%Y-%m-%d %H:%M:%S")
                 prev = datetime.strptime(time_series[5001]['datetime'], "%Y-%m-%d %H:%M:%S")

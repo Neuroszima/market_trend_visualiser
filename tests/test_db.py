@@ -2,7 +2,7 @@ import unittest
 
 import psycopg2
 
-from db_functions.db_helpers import _connection_dict, _table_rows_quantity
+import db_functions.db_helpers as helpers
 from db_functions.time_series_db import _drop_time_table, _drop_forex_table
 import db_functions
 
@@ -14,11 +14,21 @@ class DBTests(unittest.TestCase):
         db_functions.import_db_structure()
 
     def assertDatabaseHasRows(self, schema_name, table_name, correct_num_of_rows):
-        with psycopg2.connect(**_connection_dict) as conn:
+        with psycopg2.connect(**helpers._connection_dict) as conn:
             cur = conn.cursor()
-            cur.execute(_table_rows_quantity.format(schema=schema_name, table_name=table_name))
+            cur.execute(helpers._table_rows_quantity.format(schema=schema_name, table_name=table_name))
             result = cur.fetchall()
             self.assertEqual(result[0][0], correct_num_of_rows)
+
+    def assertTableExist(self, table_name, schema_name):
+        with psycopg2.connect(**helpers._connection_dict) as conn:
+            cur = conn.cursor()
+            cur.execute(helpers._information_schema_table_check.format(
+                table_name=db_functions.db_string_converter(table_name),
+                schema=db_functions.db_string_converter(schema_name),
+            ))
+            result = cur.fetchall()
+            self.assertTrue(result)
 
     def save_forex_sample(self):
         """
@@ -167,6 +177,10 @@ class DBTests(unittest.TestCase):
 
         db_functions.create_time_series(
             symbol=stock_, mic_code=market_identification_code_, time_interval=interval_)
+        self.assertTableExist(
+            table_name=f"{stock_}_{market_identification_code_}",
+            schema_name=f"{interval_}_time_series",
+        )
 
         historical_dummy_data = [
             {
@@ -189,7 +203,7 @@ class DBTests(unittest.TestCase):
         interval_ = "1min"
 
         # clean for this mini-test
-        with psycopg2.connect(**_connection_dict) as conn:
+        with psycopg2.connect(**helpers._connection_dict) as conn:
             cur_ = conn.cursor()
             cur_.execute(_drop_forex_table.format(
                 time_interval=interval_,
@@ -218,6 +232,10 @@ class DBTests(unittest.TestCase):
 
         db_functions.create_time_series(
             symbol=stock_, mic_code=market_identification_code_, time_interval=interval_)
+        self.assertTableExist(
+            table_name=f"{stock_}_{market_identification_code_}",
+            schema_name=f"{interval_}_time_series",
+        )
 
         # populate table with dummy data
         historical_dummy_data = [
@@ -255,6 +273,10 @@ class DBTests(unittest.TestCase):
         interval_ = "1min"
 
         db_functions.create_time_series(symbol=symbol, time_interval=interval_, is_equity=False)
+        self.assertTableExist(
+            table_name="_".join(symbol.split("/")).upper() + f"_{interval_}",
+            schema_name=f"forex_time_series",
+        )
 
         # populate table with dummy data
         historical_dummy_data = [

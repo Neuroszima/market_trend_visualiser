@@ -5,7 +5,7 @@ import psycopg2
 
 from db_functions.db_helpers import (
     _connection_dict,
-    _information_schema_time_series_check,
+    _information_schema_table_check,
     db_string_converter_
 )
 from minor_modules import time_interval_sanitizer
@@ -140,13 +140,13 @@ def time_series_table_exists_(symbol: str, time_interval: str, is_equity=True, m
             table_name = db_string_converter_(f"{symbol_}_{time_interval}")
             time_series_schema = "forex_time_series"
 
-        print(_information_schema_time_series_check.format(
+        print(_information_schema_table_check.format(
             table_name=table_name,
-            time_series_schema=db_string_converter_(time_series_schema),
+            schema=db_string_converter_(time_series_schema),
         ))
-        cur.execute(_information_schema_time_series_check.format(
+        cur.execute(_information_schema_table_check.format(
             table_name=table_name,
-            time_series_schema=db_string_converter_(time_series_schema),
+            schema=db_string_converter_(time_series_schema),
         ))
         result = cur.fetchall()
         if result:

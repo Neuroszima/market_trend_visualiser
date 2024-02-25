@@ -1,4 +1,5 @@
 from time import sleep
+from typing import Generator
 
 import api_functions
 import db_functions
@@ -7,32 +8,39 @@ from minor_modules import time_interval_sanitizer
 
 @time_interval_sanitizer()
 def time_series_save(
-        symbol: str, market_identification_code: str, time_interval: str,
-        verbose=False, api_key_permission_list: list | None = None):
+        symbol: str, market_identification_code: str, time_interval: str, is_equity: bool,
+        key_switcher: Generator, verbose=False):
     """
     automates entire process of downloading the data and then saving it directly into database from source
     """
-    raise NotImplementedError("this function is not yet ready to use")
-    # if db_functions.time_series_table_exists(symbol, market_identification_code, time_interval=time_interval):
-    #     if db_functions.time_series_latest_timestamp():
-    #         raise db_functions.TimeSeriesExists("this time series already has data, use another method to update it")
-    #     data = api_functions.download_equity_history(
-    #         symbol=symbol, mic_code=market_identification_code, verbose=verbose,
-    #         time_interval=time_interval, api_key_permission_list=api_key_permission_list
-    #     )
-    #     db_functions.insert_equity_historical_data(
-    #         data, equity_symbol=symbol, mic_code=market_identification_code, time_interval=time_interval)
-    # else:
-    #     if verbose:
-    #         print("time series not created yet, creating new and downloading")
-    #     db_functions.create_time_series(symbol, market_identification_code, time_interval=time_interval)
-    #     time_series_save(symbol, market_identification_code, verbose=verbose, time_interval=time_interval)
+    if db_functions.time_series_table_exists(
+            symbol, time_interval=time_interval, mic_code=market_identification_code):
+        if db_functions.time_series_latest_timestamp(
+                symbol, time_interval=time_interval, mic_code=market_identification_code):
+            raise db_functions.TimeSeriesExists("this time series already has data, use another method to update it")
 
+        data = api_functions.download_market_ticker_history(
+            symbol=symbol, mic_code=market_identification_code, verbose=verbose,
+            time_interval=time_interval, key_switcher=key_switcher
+        )
+        db_functions.insert_equity_historical_data(
+            data, symbol=symbol, mic_code=market_identification_code, time_interval=time_interval,
+            is_equity=is_equity
+        )
+
+    else:
+        if verbose:
+            print("time series not created yet, creating new and downloading")
+        db_functions.create_time_series(
+            symbol, time_interval=time_interval, mic_code=market_identification_code, is_equity=is_equity
+        )
+        time_series_save(
+            symbol, market_identification_code, time_interval, is_equity, key_switcher, verbose
+        )
 
 @time_interval_sanitizer()
 def time_series_full_update(
-        symbol: str, market_identification_code: str, time_interval: str,
-        api_key_permission_list: list | None = None):
+        symbol: str, market_identification_code: str, time_interval: str, key_switcher: Generator):
     """
     update time series of given symbol/exchange_code pair. Use last record in database to determine the query size
     """
@@ -109,9 +117,6 @@ def fill_database(api_key_permission_list: list | None = None):
         countries.update((str(e['country']),))
         timezones.update((str(e['timezone']),))
 
-    print(countries)
-    # return
-
     db_functions.insert_timezones(timezones)
     db_functions.insert_countries(countries)
     db_functions.insert_plans(plans)
@@ -136,14 +141,3 @@ def rebuild_database_destructively():
     db_functions.purge_db_structure()
     db_functions.import_db_structure()
 
-
-if __name__ == '__main__':
-    rebuild_database_destructively()
-    fill_database()
-    # params = {
-    #     "symbol": "NVDA",
-    #     "market_identification_code": "XNGS",
-    #     "time_interval": "1day",
-    #     "verbose": True,
-    # }
-    # time_series_full_save(**params)

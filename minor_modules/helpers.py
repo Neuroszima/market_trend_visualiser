@@ -17,7 +17,8 @@ class time_interval_sanitizer_:
                 ]:
                     result = function(*args, **kwargs)
                     return result
-                if args[-1] in self.ALLOWED_INTERVALS:
+                # print(args)
+                if args[function.__code__.co_varnames.index('time_interval')] in self.ALLOWED_INTERVALS:
                     result = function(*args, **kwargs)
                     return result
                 raise ValueError("Improper argument for this query. Possible intervals: ('1min', '1day')")

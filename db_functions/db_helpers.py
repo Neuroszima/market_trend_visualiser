@@ -7,10 +7,11 @@ _information_schema2 = "select * from information_schema.\"columns\" where table
 _table_rows_quantity = "select count(*) from \"{schema}\".\"{table_name}\";"
 
 # select table_name from information_schema.\"tables\" where table_name = {table_name}
-_information_schema_time_series_check = """
+_information_schema_table_check = """
 SELECT table_name, table_schema from information_schema.\"tables\" 
-where table_name like {table_name} and table_schema = {time_series_schema};
+where table_name like {table_name} and table_schema = {schema};
 """
+_information_schema_check = "select schema_name from \"information_schema\".schemata;"
 
 # connection dict
 _connection_dict = {
