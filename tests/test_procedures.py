@@ -58,11 +58,9 @@ class ProcedureTests(unittest.TestCase):
         for schema in additional_schemas:
             self.assertSchemaExist(schema)
 
-    @unittest.skipIf(not is_workingday(datetime.now()), "holidays do not count as trading day - trips condition")
     def test_save_ticker_fully(self):
         """to not waste that many tokens on testing, this method uses daily interval, as it is fewer downloads"""
         full_procedures.rebuild_database_destructively()
-        # full_procedures.fill_database()
         params = {
             "symbol": "NVDA",
             "market_identification_code": "XNGS",
@@ -72,13 +70,31 @@ class ProcedureTests(unittest.TestCase):
             "is_equity": True
         }
         full_procedures.time_series_save(**params)
-        last_datapoint: datetime = db_functions.time_series_latest_timestamp()
+        last_datapoint: datetime = db_functions.time_series_latest_timestamp(
+            symbol=params['symbol'], time_interval=params['time_interval'], is_equity=params['is_equity'],
+            mic_code=params['market_identification_code']
+        )
         self.assertIsNotNone(last_datapoint)
         # we check condition only up to a certain day
-        last_date = datetime(year=last_datapoint.year, month=last_datapoint.month, day=last_datapoint.day)
         today = datetime.today()
-        self.assertEqual(last_date, today)
+        if not is_workingday(today):
+            days_to_subtract = today.isoweekday() - 5
+            last_allowed_day = datetime.fromtimestamp(today.timestamp() - days_to_subtract * 24 * 60 * 60)
+        else:
+            last_allowed_day = today
+        self.assertEqual(last_datapoint.year, last_allowed_day.year)
+        self.assertEqual(last_datapoint.month, last_allowed_day.month)
+        self.assertEqual(last_datapoint.day, last_allowed_day.day)
 
     def test_update_ticker(self):
         """first download and save the ticker partially, then update it up to the most recent date (possibly today)"""
-        print(is_workingday(datetime.now()))
+        # we use daily data here as well, to save on the number of queries
+        params = {
+            "symbol": "NVDA",
+            "market_identification_code": "XNGS",
+            "time_interval": "1day",
+            "verbose": True,
+            "key_switcher": ProcedureTests.key_switcher,
+            "is_equity": True
+        }
+

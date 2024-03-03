@@ -184,17 +184,15 @@ class DBTests(unittest.TestCase):
 
         historical_dummy_data = [
             {
-                "index": 2, "equity_symbol": stock_,
-                "time_series_schema": f'"{interval_}_time_series"',
-                "market_identification_code": market_identification_code_,
-                "datetime": f"'2020-03-24 09:37:00'",
-                "open": 3, "close": 5, "high": 8, "low": 1.50,
+                "datetime": "2020-03-24 09:37:00", "open": 3, "close": 5, "high": 8, "low": 1.50,
                 "volume": 490,
             },
         ]
         db_functions.insert_equity_historical_data(
             historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
         )
+        with self.assertRaises(ValueError):  # market identifier should not be ignored when querying stock
+            db_functions.time_series_latest_timestamp(symbol=stock_, time_interval=interval_)
         self.assertIsNotNone(db_functions.time_series_latest_timestamp(
             symbol=stock_, mic_code=market_identification_code_, time_interval=interval_))
 
@@ -213,59 +211,60 @@ class DBTests(unittest.TestCase):
 
         historical_dummy_data = [
             {
-                "index": 2, "equity_symbol": symbol,
-                "time_series_schema": f'"forex_time_series"',
-                "datetime": f"'2020-03-24 09:37:00'",
-                "open": 3, "close": 5, "high": 8, "low": 1.50,
+                "datetime": "2020-03-24 09:37:00", "open": 3, "close": 5, "high": 8, "low": 1.50,
             },
         ]
         db_functions.insert_equity_historical_data(
             historical_dummy_data, symbol=symbol, time_interval=interval_, is_equity=False)
+        with self.assertRaises(ValueError):  # market identifier HAS TO be ignored when querying for currency pair
+            db_functions.time_series_latest_timestamp(
+                symbol=symbol, time_interval=interval_, mic_code=market_identification_code_, is_equity=False)
         self.assertIsNotNone(db_functions.time_series_latest_timestamp(
             symbol, interval_, is_equity=False))
 
     def test_equity_time_series_save(self):
         """test if properly formatted dummy data will be saved into database"""
         stock_, market_identification_code_ = "OTEX", "XNGS"
-        interval_ = "1min"
-        schema_name = f"{interval_}_time_series"
+        intervals = ["1min", "1day"]
 
-        db_functions.create_time_series(
-            symbol=stock_, mic_code=market_identification_code_, time_interval=interval_)
-        self.assertTableExist(
-            table_name=f"{stock_}_{market_identification_code_}",
-            schema_name=f"{interval_}_time_series",
-        )
+        for interval_ in intervals:
+            if 'min' in interval_ or 'h' in interval_:
+                datetimes = ['2020-03-24 09:37:00', '2020-03-24 09:36:00']
+            else:
+                datetimes = ['2020-03-25', '2020-03-24']
 
-        # populate table with dummy data
-        historical_dummy_data = [
-            {
-                "index": 2, "equity_symbol": stock_,
-                "time_series_schema": f'"{schema_name}"',
-                "market_identification_code": market_identification_code_,
-                "datetime": f"'2020-03-24 09:37:00'",
-                "open": 3, "close": 5, "high": 8, "low": 1.50,
-                "volume": 490,
-            },
-            {
-                "index": 1, "equity_symbol": stock_,
-                "time_series_schema": f'"{schema_name}"',
-                "market_identification_code": market_identification_code_,
-                "datetime": f"'2020-03-24 09:36:00'",
-                "open": 1, "close": 3, "high": 4, "low": 0.50,
-                "volume": 190,
-            }
-        ]
-        db_functions.insert_equity_historical_data(
-            historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
-        )
-        db_functions.insert_equity_historical_data(
-            historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_,
-            rownum_start=2,
-        )
-        table_name = stock_ + "_" + market_identification_code_
-        self.assertDatabaseHasRows(schema_name, table_name, 4)
-        assert db_functions.time_series_table_exists(stock_, interval_, mic_code=market_identification_code_)
+            schema_name = f"{interval_}_time_series"
+
+            db_functions.create_time_series(
+                symbol=stock_, mic_code=market_identification_code_, time_interval=interval_)
+            self.assertTableExist(
+                table_name=f"{stock_}_{market_identification_code_}",
+                schema_name=schema_name,
+            )
+
+            # populate table with dummy data
+            historical_dummy_data = [
+                {
+                    "datetime": datetimes[0], "open": 3, "close": 5, "high": 8, "low": 1.50,
+                    "volume": 490,
+                },
+                {
+                    "datetime": datetimes[1], "open": 1, "close": 3, "high": 4, "low": 0.50,
+                    "volume": 190,
+                }
+            ]
+            db_functions.insert_equity_historical_data(
+                historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
+            )
+            db_functions.insert_equity_historical_data(
+                historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_,
+                rownum_start=2,
+            )
+            table_name = stock_ + "_" + market_identification_code_
+            assert db_functions.time_series_table_exists(stock_, interval_, mic_code=market_identification_code_)
+            self.assertDatabaseHasRows(schema_name, table_name, 4)
+            # index should go from 0
+            self.assertEqual(helpers.last_row_ID_(schema_name, f"{stock_}_{market_identification_code_}"), 3)
 
     def test_forex_time_series_save(self):
         """test if properly formatted dummy data will be saved into database"""
@@ -281,15 +280,11 @@ class DBTests(unittest.TestCase):
         # populate table with dummy data
         historical_dummy_data = [
             {
-                "index": 2, "equity_symbol": symbol,
-                "time_series_schema": f'"forex_time_series"',
-                "datetime": f"'2020-03-24 09:37:00'",
+                "datetime": "2020-03-24 09:37:00",
                 "open": 3, "close": 5, "high": 8, "low": 1.50,
             },
             {
-                "index": 1, "equity_symbol": symbol,
-                "time_series_schema": f'"forex_time_series"',
-                "datetime": f"'2020-03-24 09:36:00'",
+                "datetime": "2020-03-24 09:36:00",
                 "open": 1, "close": 3, "high": 4, "low": 0.50,
             }
         ]

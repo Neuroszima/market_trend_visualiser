@@ -95,21 +95,25 @@ def insert_equity_historical_data_(
     :param mic_code: if inserting equity data, use it to denote exchange from which it comes
     """
 
+    if time_interval in ['1day']:  # future-thinking about other time intervals allowed by provider...
+        timestring = '%Y-%m-%d'
+    elif time_interval in ['1min']:  # ~||~ (^ as above)
+        timestring = '%Y-%m-%d %H:%M:%S'
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        if datetime.strptime(literal_eval(historical_data[0]['datetime']), '%Y-%m-%d %H:%M:%S') > \
-            datetime.strptime(literal_eval(historical_data[-1]['datetime']), '%Y-%m-%d %H:%M:%S'):
+        zero_timestamp: str = historical_data[0]['datetime']
+        last_timestamp: str = historical_data[-1]['datetime']
+        if datetime.strptime(zero_timestamp, timestring) > datetime.strptime(last_timestamp, timestring):
             historical_data = reversed(historical_data)
         #  iterate from oldest to newest - new rows will be appended to the farthest row anyway
         for rownum, candle in enumerate(historical_data):
-            print(candle)
             query_dict = {
                 "index": rownum + rownum_start,
                 "open_price": candle['open'],
                 "close_price": candle['close'],
                 "high_price": candle['high'],
                 "low_price": candle['low'],
-                "timestamp": f"{candle['datetime']}"
+                "timestamp": f"'{candle['datetime']}'"
             }
             if is_equity:
                 query_dict["equity_symbol"] = symbol
@@ -198,9 +202,13 @@ def time_series_latest_timestamp_(
         }
         if is_equity:
             q_dict["symbol"] = symbol
+            if mic_code is None:
+                raise ValueError('There has to be a market identification code passed along the stock/equity symbol')
             q_dict["market_identification_code"] = mic_code
             cur.execute(_last_equity_timetable_point.format(**q_dict))
         else:
+            if mic_code is not None:
+                raise ValueError('If not stock or equity - MIC should be ignored')
             q_dict["symbol"] = "_".join(symbol.split("/")).upper()
             cur.execute(_last_forex_timetable_point.format(**q_dict))
         last_record = cur.fetchall()
