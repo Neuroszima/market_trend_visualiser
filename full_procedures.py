@@ -1,3 +1,4 @@
+from datetime import datetime
 from time import sleep
 from typing import Generator
 
@@ -38,21 +39,43 @@ def time_series_save(
             symbol, market_identification_code, time_interval, is_equity, key_switcher, verbose
         )
 
+
 @time_interval_sanitizer()
-def time_series_full_update(
-        symbol: str, market_identification_code: str, time_interval: str, key_switcher: Generator):
+def time_series_update(
+        symbol: str, market_identification_code: str, time_interval: str, is_equity: bool,
+        key_switcher: Generator, verbose=False, end_date: datetime = None):
     """
     update time series of given symbol/exchange_code pair. Use last record in database to determine the query size
     """
-    raise NotImplementedError("this function is not yet ready to use")
 
-    # if db_functions.time_series_table_exists(
-    #         symbol, market_identification_code, time_interval=time_interval):
-    #     latest_database_timestamp = db_functions.time_series_latest_timestamp()
-    #
-    #     return
-    # raise db_functions.TimeSeriesNotFoundError(
-    #     "this time series does not exist, use another function to create and populate it")
+    if db_functions.time_series_table_exists(
+            symbol, mic_code=market_identification_code, time_interval=time_interval):
+        latest_database_timestamp = db_functions.time_series_latest_timestamp(
+            symbol, time_interval, is_equity, market_identification_code)
+        if end_date:
+            if latest_database_timestamp > end_date:
+                raise db_functions.TimeSeriesExists("this time series already covers this timestamp history")
+
+        data = api_functions.download_market_ticker_history(
+            symbol=symbol, key_switcher=key_switcher, mic_code=market_identification_code,
+            start_date=latest_database_timestamp, end_date=end_date, verbose=verbose, time_interval=time_interval
+        )
+        if is_equity:
+            schema_name = f"{time_interval}_time_series"
+            table_name = f"{symbol}_{market_identification_code}"
+        else:
+            schema_name = "forex_time_series"
+            symbol_ = "_".join(symbol.split("/")).upper()
+            table_name = f"{symbol_}_{time_interval}"
+        last_datapoint_id = db_functions.last_row_ID(schema_name, table_name)
+        db_functions.insert_equity_historical_data(
+            data, symbol=symbol, mic_code=market_identification_code, time_interval=time_interval,
+            is_equity=is_equity, rownum_start=last_datapoint_id+1
+        )
+        return
+
+    raise db_functions.TimeSeriesNotFoundError(
+        "this time series does not exist, use another function to create and populate it")
 
 
 def perpare_database():
