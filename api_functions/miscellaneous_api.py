@@ -1,7 +1,8 @@
 # from pprint import pprint
 import json
+from datetime import datetime
 from time import perf_counter, sleep
-from typing import Literal, Optional
+from typing import Literal, Optional, MutableMapping
 from contextlib import suppress
 
 from api_functions.API_URLS import *
@@ -10,10 +11,11 @@ from settings import rapid_api_keys, regular_api_keys, RAPIDAPI_HOST
 import requests
 
 JSON_RESPONSE = dict[Literal['data', 'status']]
+RESPONSE_WITH_HEADERS = tuple[dict | str, MutableMapping]
 
 
 def parse_get_response_(
-        querystring_parameters: dict, api_key_pair: tuple, data_type: str, request_type: str) -> dict | str:
+        querystring_parameters: dict, api_key_pair: tuple, data_type: str, request_type: str) -> RESPONSE_WITH_HEADERS:
     """
     prepare a request and parse response from selected API endpoint
 
@@ -57,6 +59,7 @@ def parse_get_response_(
     get_request['url'] = api + endpoint
     get_request["params"] = querystring_parameters
     response = requests.get(**get_request)
+    headers = response.headers
     match data_type:
         case "json":
             result: dict = response.json()
@@ -71,7 +74,7 @@ def parse_get_response_(
         case __:
             raise KeyError("data type must be either \'csv\' or \'json\'")
 
-    return result
+    return result, headers
 
 
 def get_api_usage_(api_key_pair: tuple):
@@ -81,8 +84,20 @@ def get_api_usage_(api_key_pair: tuple):
     rapidAPI solution does not allow for getting daily api usage, only direct TwelveData supports it
     """
     if "regular" in api_key_pair[0]:
-        return parse_get_response_(dict(), request_type="token_usage", data_type="json", api_key_pair=api_key_pair)
-    raise ValueError(f"API key with identifier {api_key_pair[0]} does not connect to direct TwelveData API")
+        return parse_get_response_(dict(), request_type="token_usage", data_type="json", api_key_pair=api_key_pair)[0]
+    elif "rapid" in api_key_pair[0]:
+        # form a response similar to regular api one, made from information obtained from headers
+        _, headers = parse_get_response_(
+            dict(), request_type="earliest_timestamp", data_type="json", api_key_pair=api_key_pair)
+        return {
+            'timestamp': datetime.strptime(headers['Date'], "%a, %d %b %Y %H:%M:%S GMT"),
+            'current_usage': int(headers['Api-Credits-Used']),
+            'plan_limit': int(headers['Api-Credits-Left']) + int(headers['Api-Credits-Used']),
+            'daily_usage': int(headers['X-RateLimit-API-credits-Limit']) -
+                           int(headers['X-RateLimit-API-credits-Remaining']),
+            'plan_daily_limit': int(headers['X-RateLimit-API-credits-Limit'])
+        }
+    raise ValueError(f"API key with identifier {api_key_pair[0]} isn't valid key to use for ")
 
 
 def get_all_equities_(
@@ -100,8 +115,9 @@ def get_all_equities_(
     """
     if not additional_params:
         additional_params = {'show_plan': True}
-    return parse_get_response_(
-        additional_params, request_type="list stocks", data_type=data_type, api_key_pair=api_key_pair)['data']
+    response_result, _ = parse_get_response_(
+        additional_params, request_type="list stocks", data_type=data_type, api_key_pair=api_key_pair)
+    return response_result['data']
 
 
 def get_all_currency_pairs_(
@@ -116,8 +132,9 @@ def get_all_currency_pairs_(
     """
     if not additional_params:
         additional_params = dict()
-    return parse_get_response_(
-        additional_params, request_type="list pairs", data_type=data_type, api_key_pair=api_key_pair)['data']
+    response_result, _ = parse_get_response_(
+        additional_params, request_type="list pairs", data_type=data_type, api_key_pair=api_key_pair)
+    return response_result['data']
 
 
 def get_all_exchanges_(
@@ -132,8 +149,9 @@ def get_all_exchanges_(
     """
     if not additional_params:
         additional_params = {'show_plan': True}
-    return parse_get_response_(
-        additional_params, request_type="list exchanges", data_type=data_type, api_key_pair=api_key_pair)['data']
+    response_result, _ = parse_get_response_(
+        additional_params, request_type="list exchanges", data_type=data_type, api_key_pair=api_key_pair)
+    return response_result['data']
 
 
 def api_key_switcher_(permitted_keys: Optional[list[str]] = None):

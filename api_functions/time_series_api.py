@@ -33,13 +33,13 @@ def obtain_earliest_timestamp_(
     if exchange:
         querystring['exchange'] = exchange
 
-    result = parse_get_response_(
+    response_result, _ = parse_get_response_(
         querystring,
         request_type="earliest_timestamp",
         data_type="json",
         api_key_pair=api_key_pair
     )
-    return result
+    return response_result
 
 
 @time_interval_sanitizer()
@@ -101,14 +101,14 @@ def download_time_series_(symbol: str, api_key_pair: tuple, exchange=None, mic_c
     if exchange:
         querystring['exchange'] = exchange
 
-    results = parse_get_response_(
+    response_result, _ = parse_get_response_(
         querystring_parameters=querystring,
         request_type="time_series",
         data_type=data_type,
         api_key_pair=api_key_pair,
     )
 
-    return results
+    return response_result
 
 
 def preprocess_dates_(start_date: datetime | None, end_date: datetime | None):

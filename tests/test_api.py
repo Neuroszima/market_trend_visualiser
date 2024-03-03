@@ -113,7 +113,7 @@ class APITests(unittest.TestCase):
         }
 
         # rapid
-        api_response = api_functions.parse_get_response(
+        api_response, _ = api_functions.parse_get_response(
             querystring,
             request_type='earliest_timestamp',
             data_type='json',
@@ -123,7 +123,7 @@ class APITests(unittest.TestCase):
         self.assertIsNotNone(api_response['unix_time'])
 
         # regular
-        api_response = api_functions.parse_get_response(
+        api_response, _ = api_functions.parse_get_response(
             querystring,
             request_type='earliest_timestamp',
             data_type='json',
@@ -183,14 +183,14 @@ class APITests(unittest.TestCase):
 
         # check the structure of the response according to the definition
         equity_example = equities[0]
-        print(equities[0])
+        # print(equities[0])
         self.assertConformsDataResponse(data_responses.equities, equity_example)
 
         # additional parameter - show_plans -> additional 'access' entry
         equities_no_plans = api_functions.get_all_equities(
             next(APITests.key_switcher), data_type='json', additional_params={'show_plan': False})
         eq_example_ = equities_no_plans[0]
-        self.assertConformsDataResponse(data_responses.equities, eq_example_)
+        self.assertConformsDataResponse(data_responses.equities_no_plan, eq_example_)
 
     def test_get_all_currency_pairs(self):
         """obtain list of tracked equities from the TwelveData provider"""
@@ -202,19 +202,21 @@ class APITests(unittest.TestCase):
 
     def test_get_api_usage(self):
         """obtain information about how many tokens have been used up already using regular API subscription"""
-        api_key = None
-        improper_key = None
+        regular_api_key = None
+        rapid_key = None
         for i, k in enumerate(APITests.key_switcher):
             if i > 2:
                 break
             if "regular" in k[0]:  # get the key that actually IS responsible with connecting to regular API
-                api_key = k
+                regular_api_key = k
             else:
-                improper_key = k
+                rapid_key = k
                 continue
-        usage_info_response = api_functions.get_api_usage(api_key)
-        with self.assertRaises(ValueError):
-            api_functions.get_api_usage(improper_key)
+        usage_info_response = api_functions.get_api_usage(regular_api_key)
+        rapid_usage_info = api_functions.get_api_usage(rapid_key)
+        print(usage_info_response)
+        print(rapid_usage_info)
+        self.assertConformsDataResponse(data_responses.api_usage, rapid_usage_info)
         self.assertConformsDataResponse(data_responses.api_usage, usage_info_response)
 
     def test_get_earliest_timestamp(self):
