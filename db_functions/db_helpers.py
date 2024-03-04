@@ -7,6 +7,7 @@ _information_schema = "select * from information_schema.\"tables\" where table_s
 _information_schema2 = "select * from information_schema.\"columns\" where table_schema LIKE 'public';"
 _table_rows_quantity = "select count(*) from \"{schema}\".\"{table_name}\";"
 _last_row_id = "select \"ID\" from \"{schema}\".\"{table_name}\" tab order by tab.\"ID\" DESC LIMIT 1;"
+_exist_in_stocks = "select public.check_is_stock('{symbol}')"
 
 # select table_name from information_schema.\"tables\" where table_name = {table_name}
 _information_schema_table_check = """
@@ -50,3 +51,11 @@ def last_row_ID_(schema_name: str, table_name: str):
         res = cur.fetchall()
     return res[0][0]
 
+
+def is_stock_(symbol: str) -> bool:
+    """search if the symbol already exist in stocks table. If not, assume forex pair"""
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_exist_in_stocks.format(symbol=symbol))
+        res = cur.fetchall()
+    return res[0][0]

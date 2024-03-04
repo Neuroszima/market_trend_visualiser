@@ -22,6 +22,7 @@ drop_tracking_view = "DROP VIEW IF EXISTS \"public\".tracked_indexes;"
 
 delete_function_1day_view = "DROP FUNCTION IF EXISTS \"public\".generate_financial_view_1day;"
 delete_function_1min_view = "DROP FUNCTION IF EXISTS \"public\".generate_financial_view_1min;"
+delete_function_check_stock = "DROP FUNCTION IF EXISTS \"public\".check_is_stock;"
 
 delete_db_user = "DROP USER IF EXISTS db_user;"
 
@@ -48,6 +49,7 @@ def purge_db_structure_():
 
         cur.execute(delete_function_1day_view)
         cur.execute(delete_function_1min_view)
+        cur.execute(delete_function_check_stock)
 
         cur.execute(delete_db_user)
 

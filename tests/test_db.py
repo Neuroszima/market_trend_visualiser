@@ -1,4 +1,5 @@
 import unittest
+from random import choices
 
 import psycopg2
 
@@ -77,9 +78,13 @@ class DBTests(unittest.TestCase):
             # groups
             currency_groups__.update((str(forex_pair_data['currency_group']),))
 
-        db_functions.insert_forex_currency_groups(currency_groups__)
-        db_functions.insert_currencies(currencies__)
-        db_functions.insert_forex_pairs_available(sample_data)
+        try:
+            db_functions.insert_forex_currency_groups(currency_groups__)
+            db_functions.insert_currencies(currencies__)
+            db_functions.insert_forex_pairs_available(sample_data)
+        except psycopg2.Error as e:
+            print(e)
+            raise AssertionError("there was an error while saving correctly formatted data")
 
     def save_markets(self):
         """
@@ -111,37 +116,22 @@ class DBTests(unittest.TestCase):
             countries_.update((str(e['country']),))
             timezones_.update((str(e['timezone']),))
 
-        db_functions.insert_timezones(timezones_)
-        db_functions.insert_countries(countries_)
-        db_functions.insert_plans(plans_)
-        db_functions.insert_markets(sample_data)
+        try:
+            db_functions.insert_timezones(timezones_)
+            db_functions.insert_countries(countries_)
+            db_functions.insert_plans(plans_)
+            db_functions.insert_markets(sample_data)
+        except psycopg2.Error as e:
+            print(e)
+            raise AssertionError("database error raised on proper insertion")
 
-    def test_save_forex_data(self):
+    def save_equities(self):
         """
-        test saving data based on a data structured identically to the one coming from JSON response from API
-
-        sample data is taken directly from API results
-        """
-        self.save_forex_sample()
-
-    def test_save_markets(self):
-        """
-        test saving data based on a data structured identically to the one coming from JSON response from API
-
-        here samples are taken directly from API, that come from a query with option "show_plans"
-        function MUST OBEY this format. No other is acceptable. (additional "access" parameter in output)
-        """
-        self.save_markets()
-
-    def test_save_equities(self):
-        """
-        test saving equity data based on structure identical to the one coming from API JSON response
+        handy procedure for saving a couple of properly formatted stocks
 
         here samples are taken directly from API, that come from a query with option "show_plans"
         function MUST OBEY this format. No other is acceptable.
         """
-        self.save_forex_sample()
-        self.save_markets()
         sample_data = [
             {'symbol': 'AADV', 'name': 'Albion Development VCT PLC', 'currency': 'GBp', 'exchange': 'LSE',
              'mic_code': 'XLON', 'country': 'United Kingdom', 'type': 'Common Stock',
@@ -168,6 +158,55 @@ class DBTests(unittest.TestCase):
         except psycopg2.Error as e:
             print(e)
             raise AssertionError("database error raised on proper insertion")
+
+    def test_save_forex_data(self):
+        """
+        test saving data based on a data structured identically to the one coming from JSON response from API
+
+        sample data is taken directly from API results
+        """
+        self.save_forex_sample()
+
+    def test_save_markets(self):
+        """
+        test saving data based on a data structured identically to the one coming from JSON response from API
+
+        here samples are taken directly from API, that come from a query with option "show_plans"
+        function MUST OBEY this format. No other is acceptable. (additional "access" parameter in output)
+        """
+        self.save_markets()
+
+    def test_save_equities(self):
+        """
+        test saving equity data based on structure identical to the one coming from API JSON response
+        """
+        self.save_forex_sample()
+        self.save_markets()
+        self.save_equities()
+
+    def test_is_stock(self):
+        """look at stock checking functionality (database function)"""
+        err_msg1 = "stock not recognized after insertion attempt - %s"
+        err_msg2 = "stock falsely recognized - %s"
+        stocks = [
+            ("NVDA", True),
+            ("OTEX", True),
+            ("AAPL", True),
+            ("XXXXXXXX", False),
+            ("AADV", True),
+            ("".join(choices("AWNGORESDZ", k=21)), False),
+            ("USD/CAD", False),
+        ]
+
+        self.save_forex_sample()
+        self.save_markets()
+        self.save_equities()
+
+        for stock, in_database in stocks:
+            if in_database:
+                self.assertTrue(db_functions.is_stock(stock), msg=err_msg1 % stock)
+            else:
+                self.assertFalse(db_functions.is_stock(stock), msg=err_msg2 % stock)
 
     def test_obtain_latest_timestamp_from_db(self):
         """obtain latest timestamp from certain timetable, for table update purpose"""

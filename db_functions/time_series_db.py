@@ -20,7 +20,7 @@ create table if not exists "{time_interval}_time_series"."{symbol}_{market_ident
     close numeric(10,5),
     high numeric(10,5),
     low numeric(10,5),
-    volume integer,
+    volume bigint,
     constraint {lower_symbol}_time_series_pkey primary key("ID")
 );
 """
@@ -32,7 +32,7 @@ create table if not exists "forex_time_series"."{symbol}_{time_interval}" (
     close numeric(10,5),
     high numeric(10,5),
     low numeric(10,5),
-    constraint {lower_symbol}_time_series_pkey primary key("ID")
+    constraint {lower_symbol}_{time_interval}_time_series_pkey primary key("ID")
 );
 """
 
@@ -120,7 +120,12 @@ def insert_equity_historical_data_(
                 query_dict["time_series_schema"] = f'"{time_interval}_time_series"'
                 query_dict["market_identification_code"] = mic_code
                 query_dict["volume"] = candle['volume']
-                cur.execute(_query_insert_equity_data.format(**query_dict))
+                try:
+                    cur.execute(_query_insert_equity_data.format(**query_dict))
+                except psycopg2.Error as e:
+                    print(e)
+                    print(query_dict)
+                    raise psycopg2.Error("there was error with database")
             else:
                 query_dict['symbol'] = "_".join(symbol.split("/")).upper()
                 query_dict['time_interval'] = time_interval

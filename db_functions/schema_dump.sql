@@ -66,58 +66,6 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: AAPL_XNGS; Type: TABLE; Schema: 1min_time_series; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS "1min_time_series"."AAPL_XNGS" (
-    "ID" integer NOT NULL,
-    datetime timestamp without time zone,
-    open numeric(10,5),
-    close numeric(10,5),
-    high numeric(10,5),
-    low numeric(10,5),
-    volume integer
-);
-
-
-ALTER TABLE "1min_time_series"."AAPL_XNGS" OWNER TO db_user;
-
---
--- Name: NVDA_XNGS; Type: TABLE; Schema: 1min_time_series; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS "1min_time_series"."NVDA_XNGS" (
-    "ID" integer NOT NULL,
-    datetime timestamp without time zone,
-    open numeric(10,5),
-    close numeric(10,5),
-    high numeric(10,5),
-    low numeric(10,5),
-    volume integer
-);
-
-
-ALTER TABLE "1min_time_series"."NVDA_XNGS" OWNER TO db_user;
-
---
--- Name: OTEX_XNGS; Type: TABLE; Schema: 1min_time_series; Owner: db_user
---
-
-CREATE TABLE IF NOT EXISTS "1min_time_series"."OTEX_XNGS" (
-    "ID" integer NOT NULL,
-    datetime timestamp without time zone,
-    open numeric(10,5),
-    close numeric(10,5),
-    high numeric(10,5),
-    low numeric(10,5),
-    volume integer
-);
-
-
-ALTER TABLE "1min_time_series"."OTEX_XNGS" OWNER TO db_user;
-
-
---
 -- Name: countries; Type: TABLE; Schema: public; Owner: db_user
 --
 
@@ -335,28 +283,22 @@ ALTER FUNCTION public.generate_financial_view_1min(tbl_name text) OWNER TO db_us
 
 
 --
--- Name: AAPL_XNGS aapl_time_series_key; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
+-- Name: check_is_stock(text); Type: FUNCTION; Schema: public; Owner: db_user
 --
 
-ALTER TABLE ONLY "1min_time_series"."AAPL_XNGS"
-    ADD CONSTRAINT aapl_time_series_key PRIMARY KEY ("ID");
+CREATE FUNCTION public.check_is_stock(symbol_to_check text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.stocks
+        WHERE symbol = symbol_to_check
+    );
+END;
+$$;
 
 
---
--- Name: NVDA_XNGS nvda_time_series_pkey; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
---
-
-ALTER TABLE ONLY "1min_time_series"."NVDA_XNGS"
-    ADD CONSTRAINT nvda_time_series_pkey PRIMARY KEY ("ID");
-
-
---
--- Name: OTEX_XNGS otex_time_series_pkey; Type: CONSTRAINT; Schema: 1min_time_series; Owner: db_user
---
-
-ALTER TABLE ONLY "1min_time_series"."OTEX_XNGS"
-    ADD CONSTRAINT otex_time_series_pkey PRIMARY KEY ("ID");
-
+ALTER FUNCTION public.check_is_stock(symbol_to_check text) OWNER TO db_user;
 
 
 --
