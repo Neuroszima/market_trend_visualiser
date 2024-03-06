@@ -1,10 +1,15 @@
 from datetime import datetime
-from time import sleep
 from typing import Generator
+from warnings import warn
 
 import api_functions
 import db_functions
 from minor_modules import time_interval_sanitizer
+
+
+def exotic_markets_warning():
+    warn("So far this function has not been tested with keys that are listed as 'paid' service. "
+         "I.e. I do not know how the function will perform for symbols from exotic markets (like Indonesia)")
 
 
 @time_interval_sanitizer()
@@ -13,6 +18,7 @@ def time_series_save(
     """
     automates entire process of downloading the data and then saving it directly into database from source
     """
+    exotic_markets_warning()
     is_equity = db_functions.is_stock(symbol)
     if db_functions.time_series_table_exists(
             symbol, time_interval=time_interval, mic_code=market_identification_code, is_equity=is_equity):
@@ -47,6 +53,7 @@ def time_series_update(
     """
     update time series of given symbol/exchange_code pair. Use last record in database to determine the query size
     """
+    exotic_markets_warning()
     is_equity = db_functions.is_stock(symbol)
     if db_functions.time_series_table_exists(
             symbol, mic_code=market_identification_code, time_interval=time_interval, is_equity=is_equity):
