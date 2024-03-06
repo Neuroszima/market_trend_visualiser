@@ -17,7 +17,6 @@ class time_interval_sanitizer_:
                 ]:
                     result = function(*args, **kwargs)
                     return result
-                # print(args)
                 if args[function.__code__.co_varnames.index('time_interval')] in self.ALLOWED_INTERVALS:
                     result = function(*args, **kwargs)
                     return result

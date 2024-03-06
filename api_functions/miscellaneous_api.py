@@ -23,11 +23,12 @@ def parse_get_response_(
     """
     # make sure request will look like this:
     # response = requests.get(url=EARLIEST_TIMESTAMP, params=querystring, headers=headers)
-
     match request_type:
         case "earliest_timestamp":
+            querystring_parameters['timezone'] = "Europe/London"
             endpoint = EARLIEST_TIMESTAMP_URL
         case "time_series":
+            querystring_parameters['timezone'] = "Europe/London"
             endpoint = TIME_SERIES_URL
         case "list indices":
             endpoint = LIST_OF_AVAILABLE_INDICES
@@ -182,8 +183,8 @@ def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
             yield key_name, keys_dict[key_name][0]
             keys_dict[key_name][1] = True
             # pprint(keys_dict)
-        if (time_passed := perf_counter() - start) < 7.85:  # 8 requests per minute check
-            sleep(7.85 - time_passed)
+        if (time_passed := perf_counter() - start) < 7.97:  # 8 requests per minute check
+            sleep(7.97 - time_passed)
         # keys have "clocked out" - they can be used again without danger of "too fast" error
         for key_name in permitted_keys:
             keys_dict[key_name][1] = False

@@ -9,15 +9,15 @@ from minor_modules import time_interval_sanitizer
 
 @time_interval_sanitizer()
 def time_series_save(
-        symbol: str, market_identification_code: str, time_interval: str, is_equity: bool,
-        key_switcher: Generator, verbose=False):
+        symbol: str, market_identification_code: str, time_interval: str, key_switcher: Generator, verbose=False):
     """
     automates entire process of downloading the data and then saving it directly into database from source
     """
+    is_equity = db_functions.is_stock(symbol)
     if db_functions.time_series_table_exists(
-            symbol, time_interval=time_interval, mic_code=market_identification_code):
+            symbol, time_interval=time_interval, mic_code=market_identification_code, is_equity=is_equity):
         if db_functions.time_series_latest_timestamp(
-                symbol, time_interval=time_interval, mic_code=market_identification_code):
+                symbol, is_equity=is_equity, time_interval=time_interval, mic_code=market_identification_code):
             raise db_functions.TimeSeriesExists("this time series already has data, use another method to update it")
 
         data = api_functions.download_market_ticker_history(
@@ -36,20 +36,20 @@ def time_series_save(
             symbol, time_interval=time_interval, mic_code=market_identification_code, is_equity=is_equity
         )
         time_series_save(
-            symbol, market_identification_code, time_interval, is_equity, key_switcher, verbose
+            symbol, market_identification_code, time_interval, key_switcher, verbose
         )
 
 
 @time_interval_sanitizer()
 def time_series_update(
-        symbol: str, market_identification_code: str, time_interval: str, is_equity: bool,
-        key_switcher: Generator, verbose=False, end_date: datetime = None):
+        symbol: str, market_identification_code: str, time_interval: str, key_switcher: Generator,
+        verbose: bool = False, end_date: datetime | None = None):
     """
     update time series of given symbol/exchange_code pair. Use last record in database to determine the query size
     """
-
+    is_equity = db_functions.is_stock(symbol)
     if db_functions.time_series_table_exists(
-            symbol, mic_code=market_identification_code, time_interval=time_interval):
+            symbol, mic_code=market_identification_code, time_interval=time_interval, is_equity=is_equity):
         latest_database_timestamp = db_functions.time_series_latest_timestamp(
             symbol, time_interval, is_equity, market_identification_code)
         if end_date:
@@ -83,13 +83,12 @@ def perpare_database():
     db_functions.import_db_structure()
 
 
-def fill_database(api_key_permission_list: list | None = None):
+def fill_database(key_switcher: Generator):
     """
     Fill in empty database with basic information to make it ready-to-use. After this step, it should be able to
     make timeseries views, as well as time series saves/updates
     """
     # download all the necessary data
-    key_switcher = api_functions.api_key_switcher(permitted_keys=api_key_permission_list)
     forex_data: list[dict] = api_functions.get_all_currency_pairs(next(key_switcher), 'json')
     stock_markets_data: list[dict] = api_functions.get_all_exchanges(next(key_switcher), 'json')
     stocks_data: list[dict] = api_functions.get_all_equities(next(key_switcher), 'json')

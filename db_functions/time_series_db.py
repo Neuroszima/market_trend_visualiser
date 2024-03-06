@@ -149,10 +149,10 @@ def time_series_table_exists_(symbol: str, time_interval: str, is_equity=True, m
             table_name = db_string_converter_(f"{symbol_}_{time_interval}")
             time_series_schema = "forex_time_series"
 
-        print(_information_schema_table_check.format(
-            table_name=table_name,
-            schema=db_string_converter_(time_series_schema),
-        ))
+        # print(_information_schema_table_check.format(
+        #     table_name=table_name,
+        #     schema=db_string_converter_(time_series_schema),
+        # ))
         cur.execute(_information_schema_table_check.format(
             table_name=table_name,
             schema=db_string_converter_(time_series_schema),
@@ -223,3 +223,6 @@ def time_series_latest_timestamp_(
             t_ = None
         return t_
 
+
+def get_datapoint(symbol: str, time_interval: str,  date: datetime, is_equity: bool = True, mic_code: str | None = None):
+    """get a single datapoint from the database """
