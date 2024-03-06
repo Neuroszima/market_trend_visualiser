@@ -32,7 +32,8 @@ purge_db_structure: Callable = purge_database.purge_db_structure_
 
 import_db_structure: Callable = setup_database.import_db_structure_
 
-db_string_converter: Callable = db_helpers.db_string_converter_
+db_string_converter: Callable[[str], str] = db_helpers.db_string_converter_
+list_nonstandard_functions: Callable = db_helpers.list_nonstandard_functions_
 last_row_ID: Callable[[str, str], str] = db_helpers.last_row_ID_
 is_stock: Callable[[str], bool] = db_helpers.is_stock_
 TimeSeriesNotFoundError: type[Exception] = db_helpers.TimeSeriesNotFoundError_

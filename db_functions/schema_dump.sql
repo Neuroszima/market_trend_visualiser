@@ -229,7 +229,20 @@ ALTER TABLE public.tracked_indexes OWNER TO db_user;
 
 
 --
--- Name: generate_financial_view(text); Type: FUNCTION; Schema: public; Owner: db_user
+-- Name: non_standard_functions; Type: VIEW; Schema: public; Owner: db_user
+--
+
+CREATE VIEW public.non_standard_functions AS
+SELECT specific_name, routine_name, routine_schema, routine_type
+FROM information_schema.routines
+WHERE routine_type = 'FUNCTION'
+  AND routine_schema NOT IN ('pg_catalog', 'information_schema');
+
+
+ALTER TABLE public.non_standard_functions OWNER TO db_user;
+
+--
+-- Name: generate_financial_view_1day(text); Type: FUNCTION; Schema: public; Owner: db_user
 --
 
 CREATE FUNCTION public.generate_financial_view_1day(tbl_name text) RETURNS void
@@ -241,12 +254,11 @@ BEGIN
     view_name := tbl_name || '_view';
 
     EXECUTE format('
-        CREATE OR REPLACE VIEW "public".%I AS
+        CREATE OR REPLACE VIEW "1day_time_series".%I AS
         SELECT
             *,
-            (fin_tab.open - fin_tab.close > 0) AS bearish,
-            (fin_tab.open - fin_tab.close < 0) AS bullish,
-            (ABS(fin_tab.high - fin_tab.low) > 5) AS strong_trend
+            (fin_tab.open > fin_tab.close) AS bearish,
+            (fin_tab.open < fin_tab.close) AS bullish,
         FROM "1day_time_series".%I fin_tab', view_name, tbl_name);
 END;
 $$;
@@ -256,7 +268,7 @@ ALTER FUNCTION public.generate_financial_view_1day(tbl_name text) OWNER TO db_us
 
 
 --
--- Name: generate_financial_view(text); Type: FUNCTION; Schema: public; Owner: db_user
+-- Name: generate_financial_view_1min(text); Type: FUNCTION; Schema: public; Owner: db_user
 --
 
 CREATE FUNCTION public.generate_financial_view_1min(tbl_name text) RETURNS void
@@ -268,12 +280,11 @@ BEGIN
     view_name := tbl_name || '_view';
 
     EXECUTE format('
-        CREATE OR REPLACE VIEW "public".%I AS
+        CREATE OR REPLACE VIEW "1min_time_series".%I AS
         SELECT
             *,
-            (fin_tab.open - fin_tab.close > 0) AS bearish,
-            (fin_tab.open - fin_tab.close < 0) AS bullish,
-            (ABS(fin_tab.high - fin_tab.low) > 5) AS strong_trend
+            (fin_tab.open > fin_tab.close) AS bearish,
+            (fin_tab.open < fin_tab.close) AS bullish,
         FROM "1min_time_series".%I fin_tab', view_name, tbl_name);
 END;
 $$;
@@ -281,6 +292,31 @@ $$;
 
 ALTER FUNCTION public.generate_financial_view_1min(tbl_name text) OWNER TO db_user;
 
+
+--
+-- Name: generate_forex_view(text); Type: FUNCTION; Schema: public; Owner: db_user
+--
+
+CREATE FUNCTION public.generate_forex_view(tbl_name text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    view_name TEXT;
+BEGIN
+    view_name := tbl_name || '_view';
+
+    EXECUTE format('
+        CREATE OR REPLACE VIEW "forex_time_series".%I AS
+        SELECT
+            *,
+            (fin_tab.open > fin_tab.close) AS bearish,
+            (fin_tab.open < fin_tab.close) AS bullish,
+        FROM "forex_time_series".%I fin_tab', view_name, tbl_name);
+END;
+$$;
+
+
+ALTER FUNCTION public.generate_forex_view(tbl_name text) OWNER TO db_user;
 
 --
 -- Name: check_is_stock(text); Type: FUNCTION; Schema: public; Owner: db_user

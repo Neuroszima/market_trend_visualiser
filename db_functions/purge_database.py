@@ -19,9 +19,11 @@ drop_schema_1min = "DROP SCHEMA IF EXISTS \"1min_time_series\" CASCADE;"
 drop_schema_forex = "DROP SCHEMA IF EXISTS \"forex_time_series\" CASCADE;"
 
 drop_tracking_view = "DROP VIEW IF EXISTS \"public\".tracked_indexes;"
+drop_non_standard_functions_view = "DROP VIEW IF EXISTS \"public\".non_standard_functions;"
 
 delete_function_1day_view = "DROP FUNCTION IF EXISTS \"public\".generate_financial_view_1day;"
 delete_function_1min_view = "DROP FUNCTION IF EXISTS \"public\".generate_financial_view_1min;"
+delete_function_forex_view = "DROP FUNCTION IF EXISTS \"public\".generate_forex_view;"
 delete_function_check_stock = "DROP FUNCTION IF EXISTS \"public\".check_is_stock;"
 
 delete_db_user = "DROP USER IF EXISTS db_user;"
@@ -32,6 +34,7 @@ def purge_db_structure_():
     with psycopg2.connect(**_connection_dict) as conn:
         cur: psycopg2._psycopg.cursor = conn.cursor()
         cur.execute(drop_tracking_view)
+        cur.execute(drop_non_standard_functions_view)
         cur.execute(drop_time_tracking_info)
         cur.execute(drop_stocks)
         cur.execute(drop_investment_types)
@@ -49,6 +52,7 @@ def purge_db_structure_():
 
         cur.execute(delete_function_1day_view)
         cur.execute(delete_function_1min_view)
+        cur.execute(delete_function_forex_view)
         cur.execute(delete_function_check_stock)
 
         cur.execute(delete_db_user)

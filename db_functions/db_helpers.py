@@ -15,6 +15,7 @@ SELECT table_name, table_schema from information_schema.\"tables\"
 where table_name like {table_name} and table_schema = {schema};
 """
 _information_schema_check = "select schema_name from \"information_schema\".schemata;"
+_information_schema_function_check = "select * from \"public\".non_standard_functions;"
 
 # connection dict
 _connection_dict = {
@@ -59,3 +60,15 @@ def is_stock_(symbol: str) -> bool:
         cur.execute(_exist_in_stocks.format(symbol=symbol))
         res = cur.fetchall()
     return res[0][0]
+
+
+def list_nonstandard_functions_():
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_information_schema_function_check)
+        res = cur.fetchall()
+    return tuple(r for r in res)
+
+
+if __name__ == '__main__':
+    print(list_nonstandard_functions_())

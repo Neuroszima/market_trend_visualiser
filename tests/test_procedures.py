@@ -114,11 +114,23 @@ class ProcedureTests(unittest.TestCase):
             ('countries', 'public'),
             ('tracked_indexes', 'public')  # this is technically a view
         ]
+        functions_in_database = [
+            ('generate_financial_view_1min', 'public'),
+            ('generate_financial_view_1day', 'public'),
+            ('generate_forex_view', 'public'),
+            ('check_is_stock', 'public'),
+        ]
         additional_schemas = ["1min_time_series", "1day_time_series", "forex_time_series"]
         for table, schema in tables_in_database_with_schemas:
             self.assertTableExist(table, schema)
         for schema in additional_schemas:
             self.assertSchemaExist(schema)
+        function_list = [r[1:] for r in helpers.list_nonstandard_functions_()]
+        for function_name, schema in functions_in_database:
+            self.assertIn(
+                (function_name, schema, 'FUNCTION'), function_list,
+                msg=f"function not found {function_name}"
+            )
 
     def test_fill_database(self):
         """test filling database with data related to market tickers and miscellaneous information"""
