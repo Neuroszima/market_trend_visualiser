@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Generator
 from warnings import warn
 
@@ -30,7 +30,7 @@ def time_series_save(
             symbol=symbol, mic_code=market_identification_code, verbose=verbose,
             time_interval=time_interval, key_switcher=key_switcher
         )
-        db_functions.insert_equity_historical_data(
+        db_functions.insert_historical_data(
             data, symbol=symbol, mic_code=market_identification_code, time_interval=time_interval,
             is_equity=is_equity
         )
@@ -75,7 +75,7 @@ def time_series_update(
             symbol_ = "_".join(symbol.split("/")).upper()
             table_name = f"{symbol_}_{time_interval}"
         last_datapoint_id = db_functions.last_row_ID(schema_name, table_name)
-        db_functions.insert_equity_historical_data(
+        db_functions.insert_historical_data(
             data, symbol=symbol, mic_code=market_identification_code, time_interval=time_interval,
             is_equity=is_equity, rownum_start=last_datapoint_id+1
         )
@@ -169,4 +169,21 @@ def rebuild_database_destructively():
     """
     db_functions.purge_db_structure()
     db_functions.import_db_structure()
+
+
+def fetch_time_series(
+        symbol: str, time_interval: str,  is_equity: bool = True, mic_code: str | None = None,
+        start_date: datetime | None = None, end_date: datetime | None = None,
+        time_span: timedelta | None = None):
+    """
+    get data from timetable in the database
+
+    data can be obtained in two ways:
+    - provide start and end dates - function will fetch data beginning with start date all the way through
+    end date (both ends inclusive)
+    """
+    raise NotImplementedError("this function is not yet ready and is a stub")
+    # if not db_functions.time_series_table_exists(symbol, time_interval, is_equity, mic_code):
+    #     raise db_functions.TimeSeriesNotFoundError(
+    #     "Series does not exist in the database, did you perform a download?")
 

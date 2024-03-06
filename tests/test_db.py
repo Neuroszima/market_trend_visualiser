@@ -21,7 +21,7 @@ class DBTests(unittest.TestCase):
             result = cur.fetchall()
             self.assertEqual(result[0][0], correct_num_of_rows)
 
-    def assertTableExist(self, table_name, schema_name):
+    def assertTableExist(self, table_name: str, schema_name: str):
         with psycopg2.connect(**helpers._connection_dict) as conn:
             cur = conn.cursor()
             cur.execute(helpers._information_schema_table_check.format(
@@ -30,6 +30,9 @@ class DBTests(unittest.TestCase):
             ))
             result = cur.fetchall()
             self.assertTrue(result)
+
+    def assertViewExists(self, view_name: str, schema_name: str):
+        self.assertTrue(db_functions.view_exists(view_name=view_name, schema_name=schema_name))
 
     def generate_random_time_sample(self, time_interval: str, is_stock: bool, rows: int = 10):
         """generate a couple of data points for given time series"""
@@ -260,7 +263,7 @@ class DBTests(unittest.TestCase):
                 "volume": 490,
             },
         ]
-        db_functions.insert_equity_historical_data(
+        db_functions.insert_historical_data(
             historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
         )
         with self.assertRaises(ValueError):  # market identifier should not be ignored when querying stock
@@ -286,7 +289,7 @@ class DBTests(unittest.TestCase):
                 "datetime": "2020-03-24 09:37:00", "open": 3, "close": 5, "high": 8, "low": 1.50,
             },
         ]
-        db_functions.insert_equity_historical_data(
+        db_functions.insert_historical_data(
             historical_dummy_data, symbol=symbol, time_interval=interval_, is_equity=False)
         with self.assertRaises(ValueError):  # market identifier HAS TO be ignored when querying for currency pair
             db_functions.time_series_latest_timestamp(
@@ -311,10 +314,10 @@ class DBTests(unittest.TestCase):
             historical_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(5, 15))
 
             # populate table with dummy data
-            db_functions.insert_equity_historical_data(
+            db_functions.insert_historical_data(
                 historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
             )
-            db_functions.insert_equity_historical_data(
+            db_functions.insert_historical_data(
                 historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_,
                 rownum_start=len(historical_dummy_data),
             )
@@ -340,9 +343,9 @@ class DBTests(unittest.TestCase):
 
             # populate table with dummy data
             historical_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(5, 15))
-            db_functions.insert_equity_historical_data(
+            db_functions.insert_historical_data(
                 historical_dummy_data, symbol=symbol, time_interval=interval_, is_equity=False)
-            db_functions.insert_equity_historical_data(
+            db_functions.insert_historical_data(
                 historical_dummy_data, symbol=symbol, time_interval=interval_,
                 rownum_start=len(historical_dummy_data), is_equity=False
             )
@@ -351,6 +354,42 @@ class DBTests(unittest.TestCase):
             assert db_functions.time_series_table_exists(symbol, interval_, is_equity=False)
             self.assertEqual(helpers.last_row_ID_(
                 schema_name, table_name=table_), len(historical_dummy_data)*2-1)
+
+    def test_create_financial_view(self):
+        """test setting up financial views for different types of time series, as well as different timeframes"""
+        # prepare the database with dummy data
+        self.save_forex_sample()
+        self.save_markets()
+        self.save_equities()
+        cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
+        for symbol, time_interval, mic, is_equity in cases:
+            schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+            table_name = f"{symbol}_{mic}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
+
+            # no table yet - error
+            with self.assertRaises(db_functions.TimeSeriesNotFoundError):
+                db_functions.create_financial_view(symbol, time_interval, is_equity, mic_code=mic)
+
+            db_functions.create_time_series(symbol, time_interval, is_equity, mic_code=mic)
+            db_functions.create_financial_view(symbol, time_interval, is_equity, mic_code=mic)
+            self.assertViewExists(view_name=f"{table_name}_view", schema_name=schema_name)
+
+    @unittest.skip("this is a test stub")
+    def test_get_data_from_database(self):
+        pass
+
+    @unittest.skip("this is a test stub")
+    def test_get_data_from_view(self):
+        pass
+
+    @unittest.skip("this is a test stub")
+    def test_view_structure(self):
+        pass
 
 
 if __name__ == '__main__':

@@ -230,7 +230,7 @@ class ProcedureTests(unittest.TestCase):
             )
             query_params["is_equity"] = is_equity  # after this, we need to include this parameter for other functions
             db_functions.create_time_series(**query_params)
-            db_functions.insert_equity_historical_data(historical_data=data, **query_params)
+            db_functions.insert_historical_data(historical_data=data, **query_params)
             schema_name = f"{timeframe}_time_series" if is_equity else "forex_time_series"
             table_name = f"{symbol_}_{mic}" if is_equity else "%s_%s_%s" % (*symbol_.split("/"), timeframe)
             self.assertTableHasRows(schema_name, table_name, len(data))

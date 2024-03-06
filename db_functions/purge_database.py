@@ -14,12 +14,17 @@ drop_forex_pairs = "DROP TABLE IF EXISTS \"public\".forex_pairs CASCADE;"
 drop_plans = "DROP TABLE IF EXISTS \"public\".plans CASCADE;"
 drop_countries = "DROP TABLE IF EXISTS \"public\".countries CASCADE;"
 
+# not wiping "public" can have benefits of having unique functions/views/triggers, that
+# will not get wiped when cleaning DB from contents this project has prepared
+# HOWEVER - cascade-wiping other schemas will remove all the views
+# made by functions associated with time_series
 drop_schema_1day = "DROP SCHEMA IF EXISTS \"1day_time_series\" CASCADE;"
 drop_schema_1min = "DROP SCHEMA IF EXISTS \"1min_time_series\" CASCADE;"
 drop_schema_forex = "DROP SCHEMA IF EXISTS \"forex_time_series\" CASCADE;"
 
 drop_tracking_view = "DROP VIEW IF EXISTS \"public\".tracked_indexes;"
 drop_non_standard_functions_view = "DROP VIEW IF EXISTS \"public\".non_standard_functions;"
+drop_non_standard_views_view = "DROP VIEW IF EXISTS \"public\".non_standard_views;"
 
 delete_function_1day_view = "DROP FUNCTION IF EXISTS \"public\".generate_financial_view_1day;"
 delete_function_1min_view = "DROP FUNCTION IF EXISTS \"public\".generate_financial_view_1min;"
@@ -35,6 +40,7 @@ def purge_db_structure_():
         cur: psycopg2._psycopg.cursor = conn.cursor()
         cur.execute(drop_tracking_view)
         cur.execute(drop_non_standard_functions_view)
+        cur.execute(drop_non_standard_views_view)
         cur.execute(drop_time_tracking_info)
         cur.execute(drop_stocks)
         cur.execute(drop_investment_types)

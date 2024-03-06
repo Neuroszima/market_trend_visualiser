@@ -8,6 +8,7 @@ import db_functions.time_series_db as time_series_db
 import db_functions.purge_database as purge_database
 import db_functions.setup_database as setup_database
 import db_functions.db_helpers as db_helpers
+import db_functions.db_views as db_views
 
 
 insert_currencies: Callable = forex_db.insert_currencies_
@@ -26,7 +27,11 @@ create_time_series: Callable = time_series_db.create_time_series_
 time_series_latest_timestamp: Callable[[str, str, bool, str | None], datetime] = \
     time_series_db.time_series_latest_timestamp_
 time_series_table_exists: Callable = time_series_db.time_series_table_exists_
-insert_equity_historical_data: Callable = time_series_db.insert_equity_historical_data_
+insert_historical_data: Callable = time_series_db.insert_historical_data_
+
+create_financial_view: Callable[[str, str, bool, str | None], None] = db_views.create_financial_view_
+list_nonstandard_views: Callable[[], tuple] = db_views.list_nonstandard_views_
+view_exists: Callable[[str], bool] = db_views.view_exists_
 
 purge_db_structure: Callable = purge_database.purge_db_structure_
 

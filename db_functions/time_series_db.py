@@ -1,12 +1,13 @@
 from ast import literal_eval
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import psycopg2
 
 from db_functions.db_helpers import (
     _connection_dict,
     _information_schema_table_check,
-    db_string_converter_
+    db_string_converter_,
+    TimeSeriesNotFoundError_
 )
 from minor_modules import time_interval_sanitizer
 
@@ -81,9 +82,16 @@ SELECT series.datetime FROM "forex_time_series"."{symbol}_{time_interval}" serie
 ORDER BY series."ID" DESC LIMIT 1
 """
 
+_query_get_data_from_equity_timeseries = """
+SELECT series.datetime FROM "{time_interval}_time_series"."{symbol}_{market_identification_code}" series;
+"""
+_query_get_data_from_forex_timeseries = """
+SELECT series.datetime FROM "forex_time_series"."{symbol}_{time_interval}" series ;
+"""
+
 
 @time_interval_sanitizer()
-def insert_equity_historical_data_(
+def insert_historical_data_(
         historical_data: list[dict], symbol: str, time_interval: str,
         rownum_start: int = 0, is_equity=True, mic_code: str | None = None
 ):
@@ -148,11 +156,6 @@ def time_series_table_exists_(symbol: str, time_interval: str, is_equity=True, m
             symbol_ = "_".join(symbol.split("/")).upper()  # fixing some small characters like in "GBp"
             table_name = db_string_converter_(f"{symbol_}_{time_interval}")
             time_series_schema = "forex_time_series"
-
-        # print(_information_schema_table_check.format(
-        #     table_name=table_name,
-        #     schema=db_string_converter_(time_series_schema),
-        # ))
         cur.execute(_information_schema_table_check.format(
             table_name=table_name,
             schema=db_string_converter_(time_series_schema),
@@ -221,8 +224,14 @@ def time_series_latest_timestamp_(
             t_ = last_record[0][0]  # this will already be a "datetime.datetime()" python object
         except IndexError:
             t_ = None
-        return t_
+    return t_
 
 
-def get_datapoint(symbol: str, time_interval: str,  date: datetime, is_equity: bool = True, mic_code: str | None = None):
-    """get a single datapoint from the database """
+def calculate_fetch_time_bracket(
+        start_date: datetime | None = None, end_date: datetime | None = None,
+        time_span: timedelta | None = None):
+    """
+    calculates what should be the start and end date of a range for fetch function to work properly
+    """
+    raise NotImplementedError("this function is not yet ready and is a stub")
+

@@ -241,6 +241,19 @@ WHERE routine_type = 'FUNCTION'
 
 ALTER TABLE public.non_standard_functions OWNER TO db_user;
 
+
+--
+-- Name: non_standard_views; Type: VIEW; Schema: public; Owner: db_user
+--
+
+CREATE VIEW public.non_standard_views AS
+SELECT table_schema, table_name
+FROM information_schema.views
+WHERE table_schema NOT IN ('pg_catalog', 'information_schema');
+
+
+ALTER TABLE public.non_standard_views OWNER TO db_user;
+
 --
 -- Name: generate_financial_view_1day(text); Type: FUNCTION; Schema: public; Owner: db_user
 --
