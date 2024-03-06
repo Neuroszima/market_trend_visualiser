@@ -258,7 +258,7 @@ BEGIN
         SELECT
             *,
             (fin_tab.open > fin_tab.close) AS bearish,
-            (fin_tab.open < fin_tab.close) AS bullish,
+            (fin_tab.open < fin_tab.close) AS bullish
         FROM "1day_time_series".%I fin_tab', view_name, tbl_name);
 END;
 $$;
@@ -284,7 +284,7 @@ BEGIN
         SELECT
             *,
             (fin_tab.open > fin_tab.close) AS bearish,
-            (fin_tab.open < fin_tab.close) AS bullish,
+            (fin_tab.open < fin_tab.close) AS bullish
         FROM "1min_time_series".%I fin_tab', view_name, tbl_name);
 END;
 $$;
@@ -310,7 +310,7 @@ BEGIN
         SELECT
             *,
             (fin_tab.open > fin_tab.close) AS bearish,
-            (fin_tab.open < fin_tab.close) AS bullish,
+            (fin_tab.open < fin_tab.close) AS bullish
         FROM "forex_time_series".%I fin_tab', view_name, tbl_name);
 END;
 $$;
