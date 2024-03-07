@@ -23,3 +23,8 @@ CREATE VIEW "public".tracked_indexes AS
     ) intermediate
     LEFT JOIN "public".markets m
     on intermediate.exchange = m."ID";
+
+-- funny idea - check for closest day/minute if day has not been found...? Alongside with helpful time type-casts
+select date_trunc('month', (select datetime from "forex_time_series"."USD_EUR_1min"));
+select TIMESTAMP '2020-03-20' + INTERVAL '1 day';
+select date_trunc('day', (select datetime from "forex_time_series"."USD_EUR_1min")) + INTERVAL '1 days';

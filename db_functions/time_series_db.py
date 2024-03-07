@@ -1,5 +1,6 @@
 from ast import literal_eval
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 import psycopg2
 
@@ -7,7 +8,8 @@ from db_functions.db_helpers import (
     _connection_dict,
     _information_schema_table_check,
     db_string_converter_,
-    TimeSeriesNotFoundError_
+    TimeSeriesNotFoundError_,
+    DataNotPresentError_
 )
 from minor_modules import time_interval_sanitizer
 
@@ -83,11 +85,27 @@ ORDER BY series."ID" DESC LIMIT 1
 """
 
 _query_get_data_from_equity_timeseries = """
-SELECT series.datetime FROM "{time_interval}_time_series"."{symbol}_{market_identification_code}" series;
+SELECT * FROM "{time_interval}_time_series"."{symbol}_{market_identification_code}";
 """
 _query_get_data_from_forex_timeseries = """
-SELECT series.datetime FROM "forex_time_series"."{symbol}_{time_interval}" series ;
+SELECT * FROM "forex_time_series"."{symbol}_{time_interval}";
 """
+_query_get_single_forex_timeseries_point = """
+SELECT * FROM "forex_time_series"."{symbol}_{time_interval}" series where series.datetime = '{search_date}';
+"""
+_query_get_single_equity_timeseries_point = """
+SELECT * FROM "{time_interval}_time_series"."{symbol}_{market_identification_code}" series
+where series.datetime = '{search_date}';
+"""
+_query_get_ID_from_table_by_date = """
+SELECT "ID" FROM "{schema_name}"."{table_name}" series
+where series.datetime {operation} TIMESTAMP '{search_date}' ORDER BY series.datetime {operation_order} LIMIT 1;
+"""
+_query_get_point_by_ID = "SELECT * FROM \"{schema_name}\".\"{table_name}\" series WHERE series.\"ID\" = {id_}"
+# _query_get_latest_ID_from_table_by_date = """
+# SELECT "ID" FROM "{schema_name}"."{table_name}" series
+# where series.datetime > TIMESTAMP '{search_date}' ORDER BY series.datetime ASC LIMIT 1'
+# """
 
 
 @time_interval_sanitizer()
@@ -108,6 +126,7 @@ def insert_historical_data_(
     elif time_interval in ['1min']:  # ~||~ (^ as above)
         timestring = '%Y-%m-%d %H:%M:%S'
     with psycopg2.connect(**_connection_dict) as conn:
+        conn.autocommit = True
         cur = conn.cursor()
         zero_timestamp: str = historical_data[0]['datetime']
         last_timestamp: str = historical_data[-1]['datetime']
@@ -138,7 +157,7 @@ def insert_historical_data_(
                 query_dict['symbol'] = "_".join(symbol.split("/")).upper()
                 query_dict['time_interval'] = time_interval
                 cur.execute(_query_insert_forex_data.format(**query_dict))
-            conn.commit()
+            # conn.commit()
         cur.close()
 
 
@@ -227,11 +246,128 @@ def time_series_latest_timestamp_(
     return t_
 
 
-def calculate_fetch_time_bracket(
-        start_date: datetime | None = None, end_date: datetime | None = None,
-        time_span: timedelta | None = None):
+def get_point_raw_by_pk_(id_: int, table_name: str, schema_name: str) -> tuple:
     """
-    calculates what should be the start and end date of a range for fetch function to work properly
+    the simplest form of fetching data from the table
+    column "ID" serves as the primary key of every time series that comes into existence
+    """
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        print(id_, table_name, schema_name)
+        cur.execute(_query_get_point_by_ID.format(
+            schema_name=schema_name, table_name=table_name, id_=id_,
+        ))
+        res = cur.fetchall()
+    print(res)
+    return res[0]
+
+
+def get_datapoint_by_date_(
+        symbol: str, time_interval: str, date: datetime | str, is_equity: bool, mic_code: str | None = None):
+    """
+    Obtain a point from database based on timestamp
+    For now we require absolute precision in terms of selecting dates. If you fail to pass a date,
+    that already has a point associated with it, this function will raise.
+    """
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        if is_equity:
+            q = _query_get_single_equity_timeseries_point.format(
+                symbol=symbol, time_interval=time_interval,
+                market_identification_code=mic_code,
+                search_date=str(date)
+            )
+        else:
+            q = _query_get_single_forex_timeseries_point.format(
+                symbol="_".join(symbol.split("/")),
+                time_interval=time_interval,
+                search_date=str(date)
+            )
+        print(q)
+        cur.execute(q)
+        res = cur.fetchall()
+    if not res:
+        raise DataNotPresentError_(f"There is no point in data that is associated with date: {date}")
+    return res
+
+
+def locate_closest_datapoint_(
+        date_to_check: datetime, schema_name: str, table_name: str, operation: Literal['<=', '>=']):
+    """search for the closest datapoint to the date given as argument"""
+    # raise NotImplementedError("this function is not yet ready and is a stub")
+    if operation not in ['<=', '>=']:
+        raise ValueError(f'Operation {operation} is not allowed. allowed operations: "<=", "=>"')
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_get_ID_from_table_by_date.format(
+            schema_name=schema_name,
+            table_name=table_name,
+            operation=operation,
+            search_date=str(date_to_check),
+            operation_order="ASC" if operation == ">=" else "DESC"
+        ))
+        res = cur.fetchall()
+    if not res:
+        raise DataNotPresentError_(
+            f"Couldn't find datapoint closest to {date_to_check}"
+            f'parameters: {schema_name=}, {table_name=}, {operation=}'
+        )
+    return res[0][0]
+
+
+def calculate_fetch_time_bracket_(
+        schema_name: str, table_name: str,
+        # symbol: str, time_interval: str, is_equity: bool, mic_code: str | None = None,
+        start_date: datetime | None = None, end_date: datetime | None = None,
+        time_span: timedelta | None = None, trading_time_span: int | None = None):
+    """
+    Calculates what should be the start and end date of a range for fetch function to work properly
+
+    Symbol, interval, is_equity and mic_code determine table to perform a search and optimizations.
+    dates and time_span determine the approximate number of datapoints to fetch (by performing ID lookup)
+
+    Difference between 'time_span' and 'trading_timespan' is as follows. Example takes "90 day lookup, 1-day timeframe".
+    Former will look up at for example 3 months of trading, and it will be less than 90 datapoints
+    because of Saturdays/Sundays/holidays, while latter will yield 90 trading days worth of data (up to today of course)
+
+    If you provide multiple parameters, start_date and end_date will take precedence over passed time spans
     """
     raise NotImplementedError("this function is not yet ready and is a stub")
-
+    # # decide if it is possible to form a bracket
+    # missing_count = [
+    #     not start_date, not end_date,
+    #     (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
+    # ].count(True)
+    # if missing_count > 1:
+    #     raise LookupError(
+    #         "At least 2 different parameters need to be passed to form a db lookup range, "
+    #         "that can be used to perform a database fetch. \nChoose one configuration:"
+    #         "(Two dates 'start-end'; One date, one interval)"
+    #     )
+    #
+    # # retrieve schema and table names
+    # # schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+    # # table_name = f"{symbol}_{mic_code}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
+    #
+    # # calculate start and end of bracket, if datetime/timedelta was passed
+    # if start_date and time_span and (end_date is None):
+    #     end_date = start_date + time_span
+    # elif end_date and time_span and (start_date is None):
+    #     start_date = end_date - time_span
+    #
+    # earliest_id, latest_id = None, None
+    # # find ID of the item that is associated with the earliest possible datapoint closest to start_date
+    # if start_date:
+    #     earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation="<")
+    # # find ID of the item that is associated with the latest possible datapoint closest to end_date
+    # if end_date:
+    #     latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation=">")
+    #
+    # if (not latest_id) and (trading_time_span is not None) and earliest_id:
+    #     latest_id = earliest_id + trading_time_span
+    # if (not earliest_id) and (trading_time_span is not None) and latest_id:
+    #     earliest_id = latest_id - trading_time_span
+    #
+    # # return both data ID's as (earliest, latest) tuple
+    # assert earliest_id is not None and latest_id is not None, "something went wrong with creating range"
+    # return earliest_id, latest_id

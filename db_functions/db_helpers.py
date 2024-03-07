@@ -8,6 +8,7 @@ _information_schema2 = "select * from information_schema.\"columns\" where table
 _table_rows_quantity = "select count(*) from \"{schema}\".\"{table_name}\";"
 _last_row_id = "select \"ID\" from \"{schema}\".\"{table_name}\" tab order by tab.\"ID\" DESC LIMIT 1;"
 _exist_in_stocks = "select public.check_is_stock('{symbol}')"
+_delete_single_based_on_ID = "DELETE FROM \"{schema_name}\".\"{table_name}\" tab WHERE tab.\"ID\" = {index};"
 
 # select table_name from information_schema.\"tables\" where table_name = {table_name}
 _information_schema_table_check = """
@@ -30,7 +31,11 @@ class TimeSeriesNotFoundError_(Exception):
     pass
 
 
-class TimeSeriesExists_(Exception):
+class TimeSeriesExistsError_(Exception):
+    pass
+
+
+class DataNotPresentError_(Exception):
     pass
 
 

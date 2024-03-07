@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta
 from random import choices, randint, random
 
 import psycopg2
@@ -34,13 +35,23 @@ class DBTests(unittest.TestCase):
     def assertViewExists(self, view_name: str, schema_name: str):
         self.assertTrue(db_functions.view_exists(view_name=view_name, schema_name=schema_name))
 
-    def generate_random_time_sample(self, time_interval: str, is_stock: bool, rows: int = 10):
+    def pop_row_from_database(self, day_to_pop_index, schema_name, table_name):
+        """remove single row from time series or another table, based on the ID (p-key)"""
+        with psycopg2.connect(**helpers._connection_dict) as conn:
+            cur = conn.cursor()
+            cur.execute(helpers._delete_single_based_on_ID.format(
+                schema_name=schema_name,
+                table_name=table_name,
+                index=day_to_pop_index,
+            ))
+
+    def generate_random_time_sample(self, time_interval: str, is_equity: bool, rows: int = 10):
         """generate a couple of data points for given time series"""
         year = randint(2010, 2020)
         month = randint(2, 7)
         day = randint(1, 7)
-        hour = randint(16, 18)
-        minute = randint(2, 30)
+        hour = randint(0, 3)
+        minute = randint(2, 20)
         dates = [
             f"{year}-{month}-{day+i}" if "day" in time_interval else f"{year}-{month}-{day} {hour}:{minute+i}:00"
             for i in range(rows)
@@ -52,7 +63,7 @@ class DBTests(unittest.TestCase):
             candle = sorted([randint(4, 26) for _ in range(4)])
             if not bullish:
                 candle[1], candle[2] = candle[2], candle[1]  # swap open with close
-            if is_stock:
+            if is_equity:
                 candle.append(randint(100, 300))
             candles.append(candle)
         data = [
@@ -62,10 +73,17 @@ class DBTests(unittest.TestCase):
                 "close": candle_[2], "high": candle_[3],
             } for date, candle_ in zip(dates, candles)
         ]
-        if is_stock:
+        if is_equity:
             for point, candle in zip(data, candles):
                 point['volume'] = candle[-1]
         return data
+
+    def prepare_table_for_case(self, symbol: str, time_interval: str, is_equity: bool, mic: str, inserted_rows=1):
+        """prepare a series of operations for testing database functions"""
+        db_functions.create_time_series(symbol, time_interval, is_equity, mic_code=mic)
+        dummy_data = self.generate_random_time_sample(time_interval, is_equity, rows=inserted_rows)
+        db_functions.insert_historical_data(dummy_data, symbol, time_interval, is_equity=is_equity, mic_code=mic)
+        return dummy_data
 
     def save_forex_sample(self):
         """
@@ -297,7 +315,7 @@ class DBTests(unittest.TestCase):
         self.assertIsNotNone(db_functions.time_series_latest_timestamp(
             symbol, interval_, is_equity=False))
 
-    def test_equity_time_series_save(self):
+    def test_equity_time_series_data_insertion(self):
         """test if properly formatted dummy data will be saved into database"""
         stock_, market_identification_code_ = "OTEX", "XNGS"
         intervals = ["1min", "1day"]
@@ -311,24 +329,26 @@ class DBTests(unittest.TestCase):
                 table_name=f"{stock_}_{market_identification_code_}",
                 schema_name=schema_name,
             )
-            historical_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(5, 15))
+            total_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(10, 20))
+            historical_dummy_data = total_dummy_data[:len(total_dummy_data) // 2]
+            historical_dummy_data2 = total_dummy_data[len(total_dummy_data) // 2:]
 
             # populate table with dummy data
             db_functions.insert_historical_data(
                 historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
             )
             db_functions.insert_historical_data(
-                historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_,
+                historical_dummy_data2, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_,
                 rownum_start=len(historical_dummy_data),
             )
             table_name = stock_ + "_" + market_identification_code_
             assert db_functions.time_series_table_exists(stock_, interval_, mic_code=market_identification_code_)
-            self.assertDatabaseHasRows(schema_name, table_name, len(historical_dummy_data)*2)
+            self.assertDatabaseHasRows(schema_name, table_name, len(total_dummy_data))
             # index should go from 0
             self.assertEqual(helpers.last_row_ID_(
-                schema_name, f"{stock_}_{market_identification_code_}"), len(historical_dummy_data)*2-1)
+                schema_name, f"{stock_}_{market_identification_code_}"), len(total_dummy_data)-1)
 
-    def test_forex_time_series_save(self):
+    def test_forex_time_series_data_insertion(self):
         """test if properly formatted dummy data will be saved into database"""
         symbol = "USD/CAD"
         schema_name = "forex_time_series"
@@ -342,18 +362,20 @@ class DBTests(unittest.TestCase):
             )
 
             # populate table with dummy data
-            historical_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(5, 15))
+            total_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(10, 20))
+            historical_dummy_data = total_dummy_data[:len(total_dummy_data)//2]
+            historical_dummy_data2 = total_dummy_data[len(total_dummy_data)//2:]
             db_functions.insert_historical_data(
                 historical_dummy_data, symbol=symbol, time_interval=interval_, is_equity=False)
             db_functions.insert_historical_data(
-                historical_dummy_data, symbol=symbol, time_interval=interval_,
+                historical_dummy_data2, symbol=symbol, time_interval=interval_,
                 rownum_start=len(historical_dummy_data), is_equity=False
             )
             table_ = "_".join(symbol.split("/")).upper() + f"_{interval_}"
             self.assertDatabaseHasRows("forex_time_series", table_, len(historical_dummy_data)*2)
             assert db_functions.time_series_table_exists(symbol, interval_, is_equity=False)
             self.assertEqual(helpers.last_row_ID_(
-                schema_name, table_name=table_), len(historical_dummy_data)*2-1)
+                schema_name, table_name=table_), len(total_dummy_data)-1)
 
     def test_create_financial_view(self):
         """test setting up financial views for different types of time series, as well as different timeframes"""
@@ -379,9 +401,101 @@ class DBTests(unittest.TestCase):
             db_functions.create_financial_view(symbol, time_interval, is_equity, mic_code=mic)
             self.assertViewExists(view_name=f"{table_name}_view", schema_name=schema_name)
 
-    @unittest.skip("this is a test stub")
-    def test_get_data_from_database(self):
-        pass
+    def test_get_datapoint_by_date(self):
+        # prepare the database with dummy data
+        self.save_forex_sample()
+        self.save_markets()
+        self.save_equities()
+        cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
+        for symbol, time_interval, mic, is_equity in cases:
+            if time_interval in ['1day']:
+                time_conversion = '%Y-%m-%d'
+            elif time_interval in ['1min']:
+                time_conversion = '%Y-%m-%d %H:%M:%S'
+            inserted_data = self.prepare_table_for_case(
+                symbol=symbol, time_interval=time_interval,
+                mic=mic, is_equity=is_equity
+            )
+            date_check = datetime.strptime(inserted_data[0]['datetime'], time_conversion)
+            point = db_functions.get_datapoint(symbol, time_interval, date_check, is_equity, mic_code=mic)
+            self.assertTrue(point)
+            incorrect_date = date_check - timedelta(days=randint(1, 45))
+            with self.assertRaises(helpers.DataNotPresentError_):
+                db_functions.get_datapoint(symbol, time_interval, incorrect_date, is_equity, mic_code=mic)
+
+    # @unittest.skip("this is a test stub")
+    def test_locate_closest_datapoint(self):
+        """test row locator function that is part of database data fetching functionality"""
+        self.save_forex_sample()
+        self.save_markets()
+        self.save_equities()
+        cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
+        for symbol, time_interval, mic, is_equity in cases:
+            schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+            table_name = f"{symbol}_{mic}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
+            if time_interval in ['1day']:
+                time_conversion = '%Y-%m-%d'
+            elif time_interval in ['1min']:
+                time_conversion = '%Y-%m-%d %H:%M:%S'
+            day_to_pop_index = randint(5, 15)
+            inserted_data = self.prepare_table_for_case(
+                symbol=symbol, time_interval=time_interval,
+                mic=mic, is_equity=is_equity, inserted_rows=20
+            )
+
+            # check edges of time series
+            first_date = datetime.strptime(inserted_data[0]['datetime'], time_conversion)
+            last_date = datetime.strptime(inserted_data[-1]['datetime'], time_conversion)
+            impossible_date_1 = first_date - timedelta(days=40)
+            impossible_date_2 = last_date + timedelta(days=40)
+            # check when there is gap in the data and from the middle of the series
+            middle_date_prev = datetime.strptime(inserted_data[day_to_pop_index-1]['datetime'], time_conversion)
+            middle_date_m = datetime.strptime(inserted_data[day_to_pop_index]['datetime'], time_conversion)
+            middle_date_next = datetime.strptime(inserted_data[day_to_pop_index+1]['datetime'], time_conversion)
+
+            interval_delta = timedelta(days=1) if "day" in time_interval else timedelta(minutes=1)
+
+            sub_cases = [
+                (first_date, first_date, '>=', None),
+                (last_date, last_date, '<=', None),
+                (middle_date_prev, middle_date_prev, '>=', None),
+                (middle_date_next, middle_date_next, '<=', None),
+                (impossible_date_1, impossible_date_1, '<=', db_functions.DataNotPresentError),
+                (impossible_date_2, impossible_date_2, '>=', db_functions.DataNotPresentError),
+                (middle_date_m, middle_date_m, '>=', None),
+                (middle_date_m, middle_date_m, '<=', None),
+                (middle_date_m, middle_date_m + interval_delta, '>=', None),  # after removing the middle datapoint
+                (middle_date_m, middle_date_m - interval_delta, '<=', None),
+            ]
+
+            # checks for each sub-case of current case
+            for index, (reference_date, check_date, check_condition, raised_exception) in enumerate(sub_cases):
+                if index == 8:
+                    self.pop_row_from_database(day_to_pop_index, schema_name, table_name)
+
+                if raised_exception is None:
+                    point_id = db_functions.locate_closest_datapoint(
+                        reference_date, schema_name, table_name, check_condition)
+                else:
+                    with self.assertRaises(
+                            raised_exception, msg=f"{(reference_date, check_condition, raised_exception)}"):
+                        db_functions.locate_closest_datapoint(
+                            reference_date, schema_name, table_name, check_condition)
+                    continue
+
+                fetched_data = db_functions.get_point_raw_by_pk(point_id, table_name, schema_name)
+                self.assertEqual(point_id, fetched_data[0])
+                self.assertEqual(check_date, fetched_data[1])
 
     @unittest.skip("this is a test stub")
     def test_get_data_from_view(self):

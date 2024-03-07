@@ -24,7 +24,8 @@ def time_series_save(
             symbol, time_interval=time_interval, mic_code=market_identification_code, is_equity=is_equity):
         if db_functions.time_series_latest_timestamp(
                 symbol, is_equity=is_equity, time_interval=time_interval, mic_code=market_identification_code):
-            raise db_functions.TimeSeriesExists("this time series already has data, use another method to update it")
+            raise db_functions.TimeSeriesExistsError(
+                "this time series already has data, use another method to update it")
 
         data = api_functions.download_market_ticker_history(
             symbol=symbol, mic_code=market_identification_code, verbose=verbose,
@@ -61,7 +62,7 @@ def time_series_update(
             symbol, time_interval, is_equity, market_identification_code)
         if end_date:
             if latest_database_timestamp > end_date:
-                raise db_functions.TimeSeriesExists("this time series already covers this timestamp history")
+                raise db_functions.TimeSeriesExistsError("this time series already covers this timestamp history")
 
         data = api_functions.download_market_ticker_history(
             symbol=symbol, key_switcher=key_switcher, mic_code=market_identification_code,

@@ -237,7 +237,7 @@ class ProcedureTests(unittest.TestCase):
             self.assertTimeSeriesLatestDate(**query_params, end_date=end_initial_batch)
 
             # proper update tests
-            with self.assertRaises(db_functions.TimeSeriesExists):  # date in DB already covered error
+            with self.assertRaises(db_functions.TimeSeriesExistsError):  # date in DB already covered error
                 full_procedures.time_series_update(**update_params, end_date=datetime(
                     year=randint(2006, 2011), month=randint(1, 12), day=randint(1, 27)
                 ))

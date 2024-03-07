@@ -28,6 +28,10 @@ time_series_latest_timestamp: Callable[[str, str, bool, str | None], datetime] =
     time_series_db.time_series_latest_timestamp_
 time_series_table_exists: Callable = time_series_db.time_series_table_exists_
 insert_historical_data: Callable = time_series_db.insert_historical_data_
+get_datapoint: Callable = time_series_db.get_datapoint_by_date_
+get_point_raw_by_pk: Callable = time_series_db.get_point_raw_by_pk_
+locate_closest_datapoint: Callable = time_series_db.locate_closest_datapoint_
+calculate_fetch_time_bracket: Callable = time_series_db.calculate_fetch_time_bracket_
 
 create_financial_view: Callable[[str, str, bool, str | None], None] = db_views.create_financial_view_
 list_nonstandard_views: Callable[[], tuple] = db_views.list_nonstandard_views_
@@ -42,4 +46,5 @@ list_nonstandard_functions: Callable = db_helpers.list_nonstandard_functions_
 last_row_ID: Callable[[str, str], str] = db_helpers.last_row_ID_
 is_stock: Callable[[str], bool] = db_helpers.is_stock_
 TimeSeriesNotFoundError: type[Exception] = db_helpers.TimeSeriesNotFoundError_
-TimeSeriesExists: type[Exception] = db_helpers.TimeSeriesExists_
+TimeSeriesExistsError: type[Exception] = db_helpers.TimeSeriesExistsError_
+DataNotPresentError: type[Exception] = db_helpers.DataNotPresentError_
