@@ -254,6 +254,57 @@ WHERE table_schema NOT IN ('pg_catalog', 'information_schema');
 
 ALTER TABLE public.non_standard_views OWNER TO db_user;
 
+
+--
+-- Name: forex_pairs_explained; Type: VIEW; Schema: public; Owner: db_user
+--
+
+CREATE VIEW public.forex_pairs_explained AS
+SELECT main_tab."ID", f_grps.name as currency_group_name, main_tab.symbol,
+    base_cur.symbol as base_currency_symbol, quote_cur.symbol as quote_currency_symbol,
+    base_cur.name as base_currency_name, quote_cur.name as quote_currency_name
+FROM public.forex_pairs main_tab
+LEFT JOIN public.forex_currency_groups f_grps ON main_tab.currency_group = f_grps."ID"
+LEFT JOIN public.currencies quote_cur ON main_tab.currency_quote = quote_cur."ID"
+LEFT JOIN public.currencies base_cur ON main_tab.currency_base = base_cur."ID";
+
+
+ALTER TABLE public.forex_pairs_explained OWNER TO db_user;
+
+
+--
+-- Name: forex_pairs_explained; Type: VIEW; Schema: public; Owner: db_user
+--
+
+CREATE VIEW public.markets_explained AS
+SELECT main_tab."ID", main_tab.name, main_tab.code as mic_code, tz.name as timezone_name,
+    p.plan as access_plan, cntrs.name as country_name
+FROM public.markets main_tab
+LEFT JOIN public.timezones tz ON main_tab.timezone = tz."ID"
+LEFT JOIN public.countries cntrs ON main_tab.country = cntrs."ID"
+LEFT JOIN public.plans p ON main_tab.access = p."ID";
+
+
+ALTER TABLE public.markets_explained OWNER TO db_user;
+
+
+--
+-- Name: stocks_explained; Type: VIEW; Schema: public; Owner: db_user
+--
+
+CREATE VIEW public.stocks_explained AS
+SELECT main_tab."ID", main_tab.symbol, main_tab.name, curs.symbol as currency_symbol, mkts.code as exchange_mic_code,
+    cntrs.name as country_name, i_types.name as investment_type, p.plan as access_plan
+FROM public.stocks main_tab
+LEFT JOIN public.currencies curs ON main_tab.currency = curs."ID"
+LEFT JOIN public.markets mkts ON main_tab.exchange = mkts."ID"
+LEFT JOIN public.countries cntrs ON main_tab.country = cntrs."ID"
+LEFT JOIN public.investment_types i_types ON main_tab.type = i_types."ID"
+LEFT JOIN public.plans p ON main_tab.plan = p."ID";
+
+
+ALTER TABLE public.stocks_explained OWNER TO db_user;
+
 --
 -- Name: generate_financial_view_1day(text); Type: FUNCTION; Schema: public; Owner: db_user
 --

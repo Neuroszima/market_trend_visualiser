@@ -102,10 +102,6 @@ SELECT "ID" FROM "{schema_name}"."{table_name}" series
 where series.datetime {operation} TIMESTAMP '{search_date}' ORDER BY series.datetime {operation_order} LIMIT 1;
 """
 _query_get_point_by_ID = "SELECT * FROM \"{schema_name}\".\"{table_name}\" series WHERE series.\"ID\" = {id_}"
-# _query_get_latest_ID_from_table_by_date = """
-# SELECT "ID" FROM "{schema_name}"."{table_name}" series
-# where series.datetime > TIMESTAMP '{search_date}' ORDER BY series.datetime ASC LIMIT 1'
-# """
 
 
 @time_interval_sanitizer()

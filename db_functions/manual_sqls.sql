@@ -28,3 +28,19 @@ CREATE VIEW "public".tracked_indexes AS
 select date_trunc('month', (select datetime from "forex_time_series"."USD_EUR_1min"));
 select TIMESTAMP '2020-03-20' + INTERVAL '1 day';
 select date_trunc('day', (select datetime from "forex_time_series"."USD_EUR_1min")) + INTERVAL '1 days';
+
+--ID | symbol |                 name                  | currency | exchange | country | type | plan |
+-- currencies: ID |     name     | symbol |
+-- markets: ID |  name  | access | timezone | country | code |
+-- countries: ID |  name   |
+-- investment_types: ID |     name     |
+-- plans: ID | global  | plan
+
+SELECT main_tab."ID", main_tab.symbol, main_tab.name, curs.symbol as currency_symbol, mkts.code as exchange_mic_code,
+    cntrs.name as country_name, i_types.name as investment_type, p.plan as access_plan
+FROM public.stocks main_tab
+LEFT JOIN public.currencies curs ON main_tab.currency = curs."ID"
+LEFT JOIN public.markets mkts ON main_tab.exchange = mkts."ID"
+LEFT JOIN public.countries cntrs ON main_tab.country = cntrs."ID"
+LEFT JOIN public.investment_types i_types ON main_tab.type = i_types."ID"
+LEFT JOIN public.plans p ON main_tab.plan = p."ID" LIMIT 5;

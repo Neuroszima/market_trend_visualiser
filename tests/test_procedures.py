@@ -112,13 +112,16 @@ class ProcedureTests(unittest.TestCase):
             ('forex_pairs', 'public'),
             ('plans', 'public'),
             ('countries', 'public'),
-            ('tracked_indexes', 'public')  # this is technically a view
         ]
         functions_in_database = [
             ('generate_financial_view_1min', 'public'),
             ('generate_financial_view_1day', 'public'),
             ('generate_forex_view', 'public'),
             ('check_is_stock', 'public'),
+        ]
+        views_in_database = [
+            ('public', 'markets_explained'), ('public', 'stocks_explained'), ('public', 'forex_pairs_explained'),
+            ('public', 'tracked_indexes'), ('public', 'non_standard_functions'), ('public', 'non_standard_views'),
         ]
         additional_schemas = ["1min_time_series", "1day_time_series", "forex_time_series"]
         for table, schema in tables_in_database_with_schemas:
@@ -131,6 +134,9 @@ class ProcedureTests(unittest.TestCase):
                 (function_name, schema, 'FUNCTION'), function_list,
                 msg=f"function not found {function_name}"
             )
+        views_list = helpers.list_nonstandard_views()
+        for view in views_in_database:
+            self.assertIn(view, views_list, msg=f"view not found {view[1]}")
 
     def test_fill_database(self):
         """test filling database with data related to market tickers and miscellaneous information"""
@@ -156,9 +162,7 @@ class ProcedureTests(unittest.TestCase):
         """this checks a whole download process so it needs a lot of tokens"""
         # add a couple of definitions to the database - XAU/USD as forex pair, AAPL as equity
         full_procedures.rebuild_database_destructively()
-        self.t_db.save_forex_sample()
-        self.t_db.save_markets()
-        self.t_db.save_equities()
+        self.t_db.save_samples_for_tests()
 
         # real tests
         test_cases = [
@@ -192,9 +196,7 @@ class ProcedureTests(unittest.TestCase):
         full_procedures.rebuild_database_destructively()
         # using predetermined data to fill in the database with couple necessary rows
         # following saves XAU/USD pair, so it is automatically checked if it detects it as ticker or not
-        self.t_db.save_forex_sample()
-        self.t_db.save_markets()
-        self.t_db.save_equities()
+        self.t_db.save_samples_for_tests()
         test_cases = [
             ("AAPL", "XNGS", "1day", True),  # v
             ("XAU/USD", None, "1day", False),  # v

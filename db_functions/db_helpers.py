@@ -10,13 +10,15 @@ _last_row_id = "select \"ID\" from \"{schema}\".\"{table_name}\" tab order by ta
 _exist_in_stocks = "select public.check_is_stock('{symbol}')"
 _delete_single_based_on_ID = "DELETE FROM \"{schema_name}\".\"{table_name}\" tab WHERE tab.\"ID\" = {index};"
 
-# select table_name from information_schema.\"tables\" where table_name = {table_name}
 _information_schema_table_check = """
 SELECT table_name, table_schema from information_schema.\"tables\" 
 where table_name like {table_name} and table_schema = {schema};
 """
 _information_schema_check = "select schema_name from \"information_schema\".schemata;"
+
+# Following are selects that use intermediate helper views for simplicity. These are defined in schema_dump.sql
 _information_schema_function_check = "select * from \"public\".non_standard_functions;"
+_information_schema_views_check = "select * from \"public\".non_standard_views;"
 
 # connection dict
 _connection_dict = {
@@ -75,5 +77,14 @@ def list_nonstandard_functions_():
     return tuple(r for r in res)
 
 
+def list_nonstandard_views():
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_information_schema_views_check)
+        res = cur.fetchall()
+    return tuple(r for r in res)
+
+
 if __name__ == '__main__':
     print(list_nonstandard_functions_())
+    print(list_nonstandard_views())

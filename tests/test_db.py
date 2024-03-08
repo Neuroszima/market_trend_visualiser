@@ -139,8 +139,9 @@ class DBTests(unittest.TestCase):
         except psycopg2.Error as e:
             print(e)
             raise AssertionError("there was an error while saving correctly formatted data")
+        return sample_data
 
-    def save_markets(self):
+    def save_markets_sample(self):
         """
         this procedure saves data about different stock markets
 
@@ -178,8 +179,9 @@ class DBTests(unittest.TestCase):
         except psycopg2.Error as e:
             print(e)
             raise AssertionError("database error raised on proper insertion")
+        return sample_data
 
-    def save_equities(self):
+    def save_equities_sample(self):
         """
         handy procedure for saving a couple of properly formatted stocks
 
@@ -212,6 +214,16 @@ class DBTests(unittest.TestCase):
         except psycopg2.Error as e:
             print(e)
             raise AssertionError("database error raised on proper insertion")
+        return sample_data
+
+    def save_samples_for_tests(self):
+        """
+        save all the samples prepared for db tests, for the purpose of these tests
+        and preparations of testing more sophisticated functions
+        """
+        self.save_forex_sample()
+        self.save_markets_sample()
+        self.save_equities_sample()
 
     def test_save_forex_data(self):
         """
@@ -219,7 +231,11 @@ class DBTests(unittest.TestCase):
 
         sample data is taken directly from API results
         """
+        # for now a simple check for rowcount at pre-determined data
         self.save_forex_sample()
+        self.assertDatabaseHasRows('public', 'currencies', 10)
+        self.assertDatabaseHasRows('public', 'forex_currency_groups', 4)  # this is all that TwelveData defines
+        self.assertDatabaseHasRows('public', 'forex_pairs', 7)
 
     def test_save_markets(self):
         """
@@ -228,15 +244,23 @@ class DBTests(unittest.TestCase):
         here samples are taken directly from API, that come from a query with option "show_plans"
         function MUST OBEY this format. No other is acceptable. (additional "access" parameter in output)
         """
-        self.save_markets()
+        # this can be independent from forex data saving
+        self.save_markets_sample()
+        self.assertDatabaseHasRows('public', "timezones", 4)
+        self.assertDatabaseHasRows('public', "countries", 5)  # additional country of 'Unknown' is present in db
+        self.assertDatabaseHasRows('public', "plans", 4)  # every single that TwelveData has in paid plans offer
+        self.assertDatabaseHasRows('public', "markets", 4)
 
     def test_save_equities(self):
         """
         test saving equity data based on structure identical to the one coming from API JSON response
         """
         self.save_forex_sample()
-        self.save_markets()
-        self.save_equities()
+        self.save_markets_sample()
+        # following is NOT independent on previous 2
+        data_saved = self.save_equities_sample()  # only this data will be checked
+        self.assertDatabaseHasRows('public', 'investment_types', 1)
+        self.assertDatabaseHasRows('public', 'stocks', 4)
 
     def test_is_stock(self):
         """look at stock checking functionality (database function)"""
@@ -251,10 +275,7 @@ class DBTests(unittest.TestCase):
             ("".join(choices("AWNGORESDZ", k=21)), False),
             ("USD/CAD", False),
         ]
-
-        self.save_forex_sample()
-        self.save_markets()
-        self.save_equities()
+        self.save_samples_for_tests()
 
         for stock, in_database in stocks:
             if in_database:
@@ -372,7 +393,7 @@ class DBTests(unittest.TestCase):
                 rownum_start=len(historical_dummy_data), is_equity=False
             )
             table_ = "_".join(symbol.split("/")).upper() + f"_{interval_}"
-            self.assertDatabaseHasRows("forex_time_series", table_, len(historical_dummy_data)*2)
+            self.assertDatabaseHasRows("forex_time_series", table_, len(total_dummy_data))
             assert db_functions.time_series_table_exists(symbol, interval_, is_equity=False)
             self.assertEqual(helpers.last_row_ID_(
                 schema_name, table_name=table_), len(total_dummy_data)-1)
@@ -380,9 +401,7 @@ class DBTests(unittest.TestCase):
     def test_create_financial_view(self):
         """test setting up financial views for different types of time series, as well as different timeframes"""
         # prepare the database with dummy data
-        self.save_forex_sample()
-        self.save_markets()
-        self.save_equities()
+        self.save_samples_for_tests()
         cases = [
             ("AAPL", "1day", "XNGS", True),
             ("USD/EUR", "1day", None, False),
@@ -403,9 +422,7 @@ class DBTests(unittest.TestCase):
 
     def test_get_datapoint_by_date(self):
         # prepare the database with dummy data
-        self.save_forex_sample()
-        self.save_markets()
-        self.save_equities()
+        self.save_samples_for_tests()
         cases = [
             ("AAPL", "1day", "XNGS", True),
             ("USD/EUR", "1day", None, False),
@@ -431,9 +448,7 @@ class DBTests(unittest.TestCase):
     # @unittest.skip("this is a test stub")
     def test_locate_closest_datapoint(self):
         """test row locator function that is part of database data fetching functionality"""
-        self.save_forex_sample()
-        self.save_markets()
-        self.save_equities()
+        self.save_samples_for_tests()
         cases = [
             ("AAPL", "1day", "XNGS", True),
             ("USD/EUR", "1day", None, False),
@@ -496,6 +511,20 @@ class DBTests(unittest.TestCase):
                 fetched_data = db_functions.get_point_raw_by_pk(point_id, table_name, schema_name)
                 self.assertEqual(point_id, fetched_data[0])
                 self.assertEqual(check_date, fetched_data[1])
+
+    @unittest.skip("this is a test stub")
+    def test_calculate_fetch_time_bracket(self):
+        """
+        test whether the amount (length of data to be fetched)
+        and ID's of edges of the range that is about to be queried is ok
+        """
+        self.save_samples_for_tests()
+        cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
 
     @unittest.skip("this is a test stub")
     def test_get_data_from_view(self):
