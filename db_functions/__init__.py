@@ -5,8 +5,7 @@ import db_functions.forex_db as forex_db
 import db_functions.markets_db as markets_db
 import db_functions.stocks_db as stocks_db
 import db_functions.time_series_db as time_series_db
-import db_functions.purge_database as purge_database
-import db_functions.setup_database as setup_database
+import db_functions.sql_loader as sql_loader
 import db_functions.db_helpers as db_helpers
 import db_functions.db_views as db_views
 
@@ -37,9 +36,8 @@ create_financial_view: Callable[[str, str, bool, str | None], None] = db_views.c
 list_nonstandard_views: Callable[[], tuple] = db_views.list_nonstandard_views_
 view_exists: Callable[[str], bool] = db_views.view_exists_
 
-purge_db_structure: Callable = purge_database.purge_db_structure_
-
-import_db_structure: Callable = setup_database.import_db_structure_
+purge_db_structure: Callable = sql_loader.purge_db_structure_
+import_db_structure: Callable = sql_loader.import_db_structure_
 
 db_string_converter: Callable[[str], str] = db_helpers.db_string_converter_
 list_nonstandard_functions: Callable = db_helpers.list_nonstandard_functions_
