@@ -106,6 +106,10 @@ _query_get_data_by_timestamps = """
 SELECT * FROM \"{schema_name}\".\"{table_name}\" series 
 WHERE series.datetime {earlier_bracket} {optional_and} {later_bracket} {optional_limit};
 """
+_query_get_data_by_IDs = """
+SELECT * FROM \"{schema_name}\".\"{table_name}\" series 
+WHERE series."ID" {earlier_bracket} AND {later_bracket} {optional_limit};
+"""
 
 
 @time_interval_sanitizer()

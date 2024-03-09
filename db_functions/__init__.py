@@ -13,11 +13,18 @@ import db_functions.db_views as db_views
 insert_currencies: Callable = forex_db.insert_currencies_
 insert_forex_pairs_available: Callable = forex_db.insert_forex_pairs_available_
 insert_forex_currency_groups: Callable = forex_db.insert_forex_currency_groups_
+fetch_currencies: Callable = forex_db.fetch_currencies_
+fetch_forex_currency_groups: Callable = forex_db.fetch_forex_currency_groups_
+fetch_forex_pairs: Callable = forex_db.fetch_forex_pairs_
 
 insert_markets: Callable = markets_db.insert_markets_
 insert_plans: Callable = markets_db.insert_plans_
 insert_countries: Callable = markets_db.insert_countries_
 insert_timezones: Callable = markets_db.insert_timezones_
+fetch_plans: Callable = markets_db.fetch_plans_
+fetch_markets: Callable = markets_db.fetch_markets_
+fetch_countries: Callable = markets_db.fetch_countries_
+fetch_timezones: Callable = markets_db.fetch_timezones_
 
 insert_stocks: Callable = stocks_db.insert_stocks_
 insert_investment_types: Callable = stocks_db.insert_investment_types_

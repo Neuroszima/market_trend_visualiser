@@ -21,6 +21,13 @@ VALUES (
 );
 '''
 
+# fetch queries
+# there is a view that we made previously to provide "explainable" data, not just numbers
+_query_fetch_markets = "SELECT * FROM public.\"markets_explained\" m {optional_filter};"
+_query_fetch_timezones = "SELECT * FROM public.\"timezones\" t {optional_filter};"
+_query_fetch_countries = "SELECT * FROM public.\"countries\" c {optional_filter};"
+_query_fetch_plans = "SELECT * FROM public.\"plans\" p {optional_filter};"
+
 
 def insert_countries_(countries: set):
     """
@@ -94,3 +101,96 @@ def insert_markets_(markets: list[dict]):
             conn.commit()
         cur.close()
 
+
+def fetch_markets_(
+        name_like: str | None = None, market_identification_code_like: str | None = None,
+        timezone_name_like: str | None = None, plan_name_like: str | None = None,
+        country_name_like: str | None = None):
+    """
+    Obtain a list of markets that resides in database (using a prepared view)
+
+    Additional options allow for similarities to be searched for, for example market name (example 'NASDAQ')
+    and country of origin (country is "full" -> not "US" but "United States").
+
+    Timezone info usually has a city name attached to it.
+
+    Add '%' in front or in the end of parameter to increase the likelihood of finding results
+    (example: name_like='NAS%')
+
+    Defaults to yielding entire stored information at once, from a view that explains data
+    (using view -> meaning it substitutes raw relation ID's for meaningful human-readable content)
+    """
+    filter_map = {
+        "m.name LIKE '{}'": name_like,
+        "m.mic_code LIKE '{}'": market_identification_code_like,
+        "m.timezone_name LIKE '{}'": timezone_name_like,
+        "m.access_plan LIKE '{}'": plan_name_like,
+        "m.country_name LIKE '{}'": country_name_like,
+    }
+    used_filters = [
+        key.format(value) for key, value in filter_map.items() if value is not None
+    ]
+    if len(used_filters) >= 2:
+        optional_filters = "WHERE " + "AND ".join(used_filters)
+    elif len(used_filters) == 1:
+        optional_filters = "WHERE " + used_filters[0]
+    else:
+        optional_filters = ""
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_fetch_markets.format(
+            optional_filter=optional_filters
+        ))
+        m = cur.fetchall()
+    return m
+
+
+def fetch_timezones_(name_like: str | None = None):
+    """
+    Obtain a list of timezones that resides in database
+
+    Additional options allow for similarities to be searched for namely "name" param
+    Add '%' in front or in the end of parameter to increase the likelihood of finding results
+    """
+    optional_filter = f"WHERE t.name LIKE '{name_like}'"
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_fetch_timezones.format(
+            optional_filter=optional_filter,
+        ))
+        m = cur.fetchall()
+    return m
+
+
+def fetch_countries_(name_like: str | None = None):
+    """
+    Obtain a list of countries that resides in database
+
+    Additional options allow for similarities to be searched for namely "name" param
+    Add '%' in front or in the end of parameter to increase the likelihood of finding results
+    """
+    optional_filter = f"WHERE c.name LIKE '{name_like}'"
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_fetch_countries.format(
+            optional_filter=optional_filter,
+        ))
+        m = cur.fetchall()
+    return m
+
+
+def fetch_plans_(plan_name_like: str | None = None):
+    """
+    Obtain a list of countries that resides in database
+
+    Additional options allow for similarities to be searched for namely "name" param
+    Add '%' in front or in the end of parameter to increase the likelihood of finding results
+    """
+    optional_filter = f"WHERE p.name LIKE '{plan_name_like}'"
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_fetch_plans.format(
+            optional_filter=optional_filter,
+        ))
+        m = cur.fetchall()
+    return m
