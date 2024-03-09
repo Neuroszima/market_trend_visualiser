@@ -295,17 +295,19 @@ def locate_closest_datapoint_(
         raise ValueError(f'Operation {operation} is not allowed. allowed operations: "<=", "=>"')
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        cur.execute(_query_get_ID_from_table_by_date.format(
-            schema_name=schema_name,
-            table_name=table_name,
-            operation=operation,
-            search_date=str(date_to_check),
-            operation_order="ASC" if operation == ">=" else "DESC"
-        ))
+        q = {
+            "schema_name": schema_name,
+            "table_name": table_name,
+            "operation": operation,
+            "search_date": str(date_to_check),
+            "operation_order": "ASC" if operation == ">=" else "DESC"
+        }
+        cur.execute(_query_get_ID_from_table_by_date.format(**q))
         res = cur.fetchall()
     if not res:
+        # print(_query_get_ID_from_table_by_date.format(**q))
         raise DataNotPresentError_(
-            f"Couldn't find datapoint closest to {date_to_check}"
+            f"Couldn't find datapoint closest to {date_to_check} "
             f'parameters: {schema_name=}, {table_name=}, {operation=}'
         )
     return res[0][0]
@@ -329,7 +331,7 @@ def calculate_fetch_time_bracket_(
     If you provide multiple parameters, start_date and end_date will take precedence over passed time spans
     """
     raise NotImplementedError("this function is not yet ready and is a stub")
-    # # decide if it is possible to form a bracket
+    # decide if it is possible to form a bracket
     # missing_count = [
     #     not start_date, not end_date,
     #     (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
@@ -354,16 +356,25 @@ def calculate_fetch_time_bracket_(
     # earliest_id, latest_id = None, None
     # # find ID of the item that is associated with the earliest possible datapoint closest to start_date
     # if start_date:
-    #     earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation="<")
+    #     earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation=">=")
     # # find ID of the item that is associated with the latest possible datapoint closest to end_date
     # if end_date:
-    #     latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation=">")
+    #     latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation="<=")
     #
-    # if (not latest_id) and (trading_time_span is not None) and earliest_id:
-    #     latest_id = earliest_id + trading_time_span
-    # if (not earliest_id) and (trading_time_span is not None) and latest_id:
-    #     earliest_id = latest_id - trading_time_span
+    # if (latest_id is None) and (trading_time_span is not None) and (earliest_id is not None):
+    #     latest_id = earliest_id + trading_time_span - 1
+    # if (earliest_id is None) and (trading_time_span is not None) and (latest_id is not None):
+    #     earliest_id = latest_id - trading_time_span + 1
+    #
+    # # print(not latest_id)
+    # # print(latest_id is None)
+    # # print(not earliest_id)
+    # # print(earliest_id is None)
+    # # print(trading_time_span is not None)
+    # # print(earliest_id)
+    # # print(latest_id)
     #
     # # return both data ID's as (earliest, latest) tuple
-    # assert earliest_id is not None and latest_id is not None, "something went wrong with creating range"
+    # assert earliest_id is not None and latest_id is not None, \
+    #     f"something went wrong with creating range: {earliest_id}, {latest_id}"
     # return earliest_id, latest_id

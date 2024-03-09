@@ -22,10 +22,10 @@ def time_bracket_case_generator(
             starting_index = index
         # the day prior to day that is "later" than ending timestamp
         # or -> the last day that suffice the "less than ending"
-        if (ending_index is None) and (not d["datetime_object"] <= ending_timestamp):
+        if (ending_index is None) and (d["datetime_object"] > ending_timestamp):
             ending_index = index - 1
 
-    if starting_index and (ending_index is None):
+    if (starting_index is not None) and (ending_index is None):
         if reference_dataset[-1]["datetime_object"] <= ending_timestamp:
             ending_index = len(reference_dataset) - 1
 
@@ -35,16 +35,28 @@ def time_bracket_case_generator(
     # for these we ignore what this exact function outputs, because we should raise exception in main function anyway
 
     delta = ending_timestamp - starting_timestamp  # equivalent to 'time_span'
-    span = ending_index - starting_index + 1  # equivalent to 'trading_time_span'
+    try:
+        if raised_exception:
+            span = randint(1, 102)
+            starting_index = -1000
+            ending_index = -1000
+        else:
+            # this is the REAL number of trading days, inclusive; we have to do "+1/-1" gymnastics
+            span = ending_index - starting_index + 1  # equivalent to 'trading_time_span'
+    except TypeError as e:
+        print(starting_timestamp, ending_timestamp)
+        raise e
     answer = (starting_index, ending_index)
+    answer_s1 = (starting_index, starting_index + span - 1)
+    answer_s2 = (ending_index - span + 1, ending_index)
     cases = [
         # cases in format:
         #    start_date,         end_date,    time_span, trading_time_span,  predicted_answer,  raised_exception
         (starting_timestamp, ending_timestamp,   None,         None,              answer,       raised_exception),
         (starting_timestamp,      None,         delta,         None,              answer,       raised_exception),
         (       None,        ending_timestamp,  delta,         None,              answer,       raised_exception),
-        (starting_timestamp,      None,          None,         span,              answer,       raised_exception),
-        (       None,        ending_timestamp,   None,         span,              answer,       raised_exception)
+        (starting_timestamp,      None,          None,         span,            answer_s1,      raised_exception),
+        (       None,        ending_timestamp,   None,         span,            answer_s2,      raised_exception)
     ]
     return cases
 

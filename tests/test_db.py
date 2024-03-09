@@ -481,7 +481,7 @@ class DBTests(unittest.TestCase):
                 self.assertEqual(point_id, fetched_data[0])
                 self.assertEqual(check_date, fetched_data[1])
 
-    @unittest.skip("this is a test stub")
+    # @unittest.skip("this is a test stub")
     def test_calculate_fetch_time_bracket(self):
         """
         test whether the amount (length of data to be fetched)
@@ -499,7 +499,7 @@ class DBTests(unittest.TestCase):
         ]
         for missing_input_case in missing_input_cases:
             start_date, end_date, time_span, trading_time_span = missing_input_case
-            with self.assertRaises(ValueError):
+            with self.assertRaises(LookupError, msg=f"function did not raise: {missing_input_case}"):
                 # error should be raised prior to any schema/table correctness check
                 db_functions.calculate_fetch_time_bracket(
                     "", "", start_date, end_date, time_span, trading_time_span)
@@ -510,31 +510,33 @@ class DBTests(unittest.TestCase):
             ("USD/EUR", "1min", None, False),
             ("AAPL", "1min", "XNGS", True)
         ]
-        for symbol, time_interval, mic, is_equity in cases:
+        for case in cases:
+            symbol, time_interval, mic, is_equity = case
             schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
             table_name = f"{symbol}_{mic}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
             inserted_data = self.prepare_table_for_case(
                 symbol=symbol, time_interval=time_interval,
-                mic=mic, is_equity=is_equity, inserted_rows=45
+                mic=mic, is_equity=is_equity, inserted_rows=25
             )
             sub_cases = []
             # (start of the data, end of the data)
+            print(*(str(d)+"\n" for d in inserted_data))
             sub_cases.extend(t_helpers.time_bracket_case_generator(
                 reference_dataset=inserted_data,
                 starting_timestamp=inserted_data[0]['datetime_object'],
-                ending_timestamp=inserted_data[0]['datetime_object']
+                ending_timestamp=inserted_data[-1]['datetime_object']
             ))
             # (date long prior to start of the data, date long after end of the data)
             sub_cases.extend(t_helpers.time_bracket_case_generator(
                 reference_dataset=inserted_data,
                 starting_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(30, 90)),
-                ending_timestamp=inserted_data[0]['datetime_object'] + timedelta(days=randint(30, 90))
+                ending_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(30, 90))
             ))
             # (middle of the data, middle of the data later)
             sub_cases.extend(t_helpers.time_bracket_case_generator(
                 reference_dataset=inserted_data,
                 starting_timestamp=inserted_data[randint(3, 10)]['datetime_object'],
-                ending_timestamp=inserted_data[randint(23, 30)]['datetime_object']
+                ending_timestamp=inserted_data[randint(20, 24)]['datetime_object']
             ))
             # (date prior to start of the data, date prior to start of the data)
             sub_cases.extend(t_helpers.time_bracket_case_generator(
@@ -553,10 +555,10 @@ class DBTests(unittest.TestCase):
             # (weekend day, weekend day of next week) (special case for 1day timeframe)
             if "day" in time_interval:
                 prior_weekday = next((
-                    day for day in t_helpers.generate_random_time_sample('1day', True, 45)
-                    if day['datetime_object'].isoweekday() == 5))['datetime_object']
+                    day for day in inserted_data if day['datetime_object'].isoweekday() == 5
+                ))['datetime_object']
                 prior_weekday += timedelta(days=1)
-                next_weekday = prior_weekday + timedelta(days=randint(1, 2))
+                next_weekday = prior_weekday + timedelta(days=7+randint(1, 2))
                 sub_cases.extend(t_helpers.time_bracket_case_generator(
                     reference_dataset=inserted_data,
                     starting_timestamp=prior_weekday,
@@ -579,11 +581,18 @@ class DBTests(unittest.TestCase):
 
             for sub_case in sub_cases:
                 start_date, end_date, time_span, trading_time_span, predicted_answer, raised_exception = sub_case
+                message = f'test case failed: main:{case} sub: {sub_case}'
+                print(message)
                 if raised_exception:
-                    with self.assertRaises(raised_exception):
+                    with self.assertRaises(raised_exception, msg=message):
                         db_functions.calculate_fetch_time_bracket(
                             schema_name, table_name, start_date, end_date, time_span, trading_time_span
                         )
+                    continue
+                id_bracket_ = db_functions.calculate_fetch_time_bracket(
+                    schema_name, table_name, start_date, end_date, time_span, trading_time_span
+                )
+                self.assertEqual(predicted_answer, id_bracket_, msg=message)
 
     @unittest.skip("this is a test stub")
     def test_get_data_from_view(self):
