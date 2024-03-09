@@ -34,8 +34,8 @@ time_series_latest_timestamp: Callable[[str, str, bool, str | None], datetime] =
     time_series_db.time_series_latest_timestamp_
 time_series_table_exists: Callable = time_series_db.time_series_table_exists_
 insert_historical_data: Callable = time_series_db.insert_historical_data_
-get_datapoint: Callable = time_series_db.get_datapoint_by_date_
-get_point_raw_by_pk: Callable = time_series_db.get_point_raw_by_pk_
+fetch_datapoint_by_date: Callable = time_series_db.fetch_datapoint_by_date_
+fetch_datapoint_raw_by_pk: Callable = time_series_db.fetch_datapoint_raw_by_pk_
 locate_closest_datapoint: Callable = time_series_db.locate_closest_datapoint_
 calculate_fetch_time_bracket: Callable = time_series_db.calculate_fetch_time_bracket_
 

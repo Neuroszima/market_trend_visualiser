@@ -250,7 +250,7 @@ def time_series_latest_timestamp_(
     return t_
 
 
-def get_point_raw_by_pk_(id_: int, table_name: str, schema_name: str) -> tuple:
+def fetch_datapoint_raw_by_pk_(id_: int, table_name: str, schema_name: str) -> tuple:
     """
     the simplest form of fetching data from the table
     column "ID" serves as the primary key of every time series that comes into existence
@@ -266,7 +266,7 @@ def get_point_raw_by_pk_(id_: int, table_name: str, schema_name: str) -> tuple:
     return res[0]
 
 
-def get_datapoint_by_date_(
+def fetch_datapoint_by_date_(
         symbol: str, time_interval: str, date: datetime | str, is_equity: bool, mic_code: str | None = None):
     """
     Obtain a point from database based on timestamp
