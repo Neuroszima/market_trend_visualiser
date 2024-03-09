@@ -6,7 +6,7 @@ import psycopg2
 import db_functions, api_functions
 import db_functions.db_helpers as helpers
 
-import test_db
+import tests.test_db as test_db
 
 import full_procedures
 

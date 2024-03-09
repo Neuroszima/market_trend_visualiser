@@ -189,7 +189,6 @@ def download_market_ticker_history_(
     :param start_date: historically the farthest point of interest, default to "earliest timestamp" if not passed
     :param end_date: historically the latest point of interest, default 'today' if not passed
     :param verbose: print information about download progress
-
     """
 
     start_date, end_date = preprocess_dates_(start_date, end_date)

@@ -7,6 +7,7 @@ import psycopg2
 import db_functions.db_helpers as helpers
 from db_functions.time_series_db import _drop_time_table, _drop_forex_table
 import db_functions
+import tests.t_helpers as t_helpers
 
 
 class DBTests(unittest.TestCase):
@@ -35,53 +36,10 @@ class DBTests(unittest.TestCase):
     def assertViewExists(self, view_name: str, schema_name: str):
         self.assertTrue(db_functions.view_exists(view_name=view_name, schema_name=schema_name))
 
-    def pop_row_from_database(self, day_to_pop_index, schema_name, table_name):
-        """remove single row from time series or another table, based on the ID (p-key)"""
-        with psycopg2.connect(**helpers._connection_dict) as conn:
-            cur = conn.cursor()
-            cur.execute(helpers._delete_single_based_on_ID.format(
-                schema_name=schema_name,
-                table_name=table_name,
-                index=day_to_pop_index,
-            ))
-
-    def generate_random_time_sample(self, time_interval: str, is_equity: bool, rows: int = 10):
-        """generate a couple of data points for given time series"""
-        year = randint(2010, 2020)
-        month = randint(2, 7)
-        day = randint(1, 7)
-        hour = randint(0, 3)
-        minute = randint(2, 20)
-        dates = [
-            f"{year}-{month}-{day+i}" if "day" in time_interval else f"{year}-{month}-{day} {hour}:{minute+i}:00"
-            for i in range(rows)
-        ]
-        candles = []
-        for i in range(rows):
-            bullish = 0.5 > random()
-            # following order will be low, open, close, high; bullish default
-            candle = sorted([randint(4, 26) for _ in range(4)])
-            if not bullish:
-                candle[1], candle[2] = candle[2], candle[1]  # swap open with close
-            if is_equity:
-                candle.append(randint(100, 300))
-            candles.append(candle)
-        data = [
-            {
-                "datetime": date,
-                "low": candle_[0], "open": candle_[1],
-                "close": candle_[2], "high": candle_[3],
-            } for date, candle_ in zip(dates, candles)
-        ]
-        if is_equity:
-            for point, candle in zip(data, candles):
-                point['volume'] = candle[-1]
-        return data
-
     def prepare_table_for_case(self, symbol: str, time_interval: str, is_equity: bool, mic: str, inserted_rows=1):
         """prepare a series of operations for testing database functions"""
         db_functions.create_time_series(symbol, time_interval, is_equity, mic_code=mic)
-        dummy_data = self.generate_random_time_sample(time_interval, is_equity, rows=inserted_rows)
+        dummy_data = t_helpers.generate_random_time_sample(time_interval, is_equity, span=inserted_rows)
         db_functions.insert_historical_data(dummy_data, symbol, time_interval, is_equity=is_equity, mic_code=mic)
         return dummy_data
 
@@ -350,10 +308,10 @@ class DBTests(unittest.TestCase):
                 table_name=f"{stock_}_{market_identification_code_}",
                 schema_name=schema_name,
             )
-            total_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(10, 20))
+            total_dummy_data = t_helpers.generate_random_time_sample(interval_, True, span=randint(10, 20))
             historical_dummy_data = total_dummy_data[:len(total_dummy_data) // 2]
             historical_dummy_data2 = total_dummy_data[len(total_dummy_data) // 2:]
-
+            print(interval_, total_dummy_data[0]['datetime'])
             # populate table with dummy data
             db_functions.insert_historical_data(
                 historical_dummy_data, symbol=stock_, mic_code=market_identification_code_, time_interval=interval_
@@ -367,7 +325,7 @@ class DBTests(unittest.TestCase):
             self.assertDatabaseHasRows(schema_name, table_name, len(total_dummy_data))
             # index should go from 0
             self.assertEqual(helpers.last_row_ID_(
-                schema_name, f"{stock_}_{market_identification_code_}"), len(total_dummy_data)-1)
+                schema_name, f"{stock_}_{market_identification_code_}"), len(total_dummy_data) - 1)
 
     def test_forex_time_series_data_insertion(self):
         """test if properly formatted dummy data will be saved into database"""
@@ -383,9 +341,9 @@ class DBTests(unittest.TestCase):
             )
 
             # populate table with dummy data
-            total_dummy_data = self.generate_random_time_sample(interval_, True, rows=randint(10, 20))
-            historical_dummy_data = total_dummy_data[:len(total_dummy_data)//2]
-            historical_dummy_data2 = total_dummy_data[len(total_dummy_data)//2:]
+            total_dummy_data = t_helpers.generate_random_time_sample(interval_, True, span=randint(10, 20))
+            historical_dummy_data = total_dummy_data[:len(total_dummy_data) // 2]
+            historical_dummy_data2 = total_dummy_data[len(total_dummy_data) // 2:]
             db_functions.insert_historical_data(
                 historical_dummy_data, symbol=symbol, time_interval=interval_, is_equity=False)
             db_functions.insert_historical_data(
@@ -396,7 +354,7 @@ class DBTests(unittest.TestCase):
             self.assertDatabaseHasRows("forex_time_series", table_, len(total_dummy_data))
             assert db_functions.time_series_table_exists(symbol, interval_, is_equity=False)
             self.assertEqual(helpers.last_row_ID_(
-                schema_name, table_name=table_), len(total_dummy_data)-1)
+                schema_name, table_name=table_), len(total_dummy_data) - 1)
 
     def test_create_financial_view(self):
         """test setting up financial views for different types of time series, as well as different timeframes"""
@@ -445,7 +403,6 @@ class DBTests(unittest.TestCase):
             with self.assertRaises(helpers.DataNotPresentError_):
                 db_functions.get_datapoint(symbol, time_interval, incorrect_date, is_equity, mic_code=mic)
 
-    # @unittest.skip("this is a test stub")
     def test_locate_closest_datapoint(self):
         """test row locator function that is part of database data fetching functionality"""
         self.save_samples_for_tests()
@@ -462,10 +419,11 @@ class DBTests(unittest.TestCase):
                 time_conversion = '%Y-%m-%d'
             elif time_interval in ['1min']:
                 time_conversion = '%Y-%m-%d %H:%M:%S'
-            day_to_pop_index = randint(5, 15)
+            random_existing_point = randint(5, 15)
+            random_existing_point2 = randint(25, 32)
             inserted_data = self.prepare_table_for_case(
                 symbol=symbol, time_interval=time_interval,
-                mic=mic, is_equity=is_equity, inserted_rows=20
+                mic=mic, is_equity=is_equity, inserted_rows=45
             )
 
             # check edges of time series
@@ -474,30 +432,41 @@ class DBTests(unittest.TestCase):
             impossible_date_1 = first_date - timedelta(days=40)
             impossible_date_2 = last_date + timedelta(days=40)
             # check when there is gap in the data and from the middle of the series
-            middle_date_prev = datetime.strptime(inserted_data[day_to_pop_index-1]['datetime'], time_conversion)
-            middle_date_m = datetime.strptime(inserted_data[day_to_pop_index]['datetime'], time_conversion)
-            middle_date_next = datetime.strptime(inserted_data[day_to_pop_index+1]['datetime'], time_conversion)
-
-            interval_delta = timedelta(days=1) if "day" in time_interval else timedelta(minutes=1)
+            middle_date_m = datetime.strptime(inserted_data[random_existing_point]['datetime'], time_conversion)
 
             sub_cases = [
                 (first_date, first_date, '>=', None),
                 (last_date, last_date, '<=', None),
-                (middle_date_prev, middle_date_prev, '>=', None),
-                (middle_date_next, middle_date_next, '<=', None),
+                (impossible_date_1, first_date, '>=', None),
+                (impossible_date_2, last_date, '<=', None),
                 (impossible_date_1, impossible_date_1, '<=', db_functions.DataNotPresentError),
                 (impossible_date_2, impossible_date_2, '>=', db_functions.DataNotPresentError),
                 (middle_date_m, middle_date_m, '>=', None),
                 (middle_date_m, middle_date_m, '<=', None),
-                (middle_date_m, middle_date_m + interval_delta, '>=', None),  # after removing the middle datapoint
-                (middle_date_m, middle_date_m - interval_delta, '<=', None),
             ]
+
+            # if interval is day, due to repurposing the time sample generator
+            # "middle_date" that should have been gap will be either Saturday or Sunday,
+            # referencing Friday this week and Monday next week as target comp. dates
+            if "day" in time_interval:
+                random_weekend_day = datetime.strptime(
+                    inserted_data[random_existing_point2]['datetime'], time_conversion)
+                if (weekday := random_weekend_day.isoweekday()) in (1, 2, 3, 4, 5):
+                    # in fact, not saturday or sunday...
+                    random_weekend_day += timedelta(days=6 - weekday)  # make it at least saturday
+                sub_cases.extend([
+                    # Friday check -> "<="
+                    (random_weekend_day,
+                     random_weekend_day - timedelta(days=random_weekend_day.isoweekday() - 5),
+                     '<=', None),
+                    # next Monday -> ">="
+                    (random_weekend_day,
+                     random_weekend_day + timedelta(days=8 - random_weekend_day.isoweekday()),
+                     ">=", None)
+                ])
 
             # checks for each sub-case of current case
             for index, (reference_date, check_date, check_condition, raised_exception) in enumerate(sub_cases):
-                if index == 8:
-                    self.pop_row_from_database(day_to_pop_index, schema_name, table_name)
-
                 if raised_exception is None:
                     point_id = db_functions.locate_closest_datapoint(
                         reference_date, schema_name, table_name, check_condition)
@@ -519,12 +488,102 @@ class DBTests(unittest.TestCase):
         and ID's of edges of the range that is about to be queried is ok
         """
         self.save_samples_for_tests()
+
+        # too little inputs cases:
+        missing_input_cases = [
+            (None, None, None, None),
+            (datetime.now(), None, None, None),
+            (None, datetime.now(), None, None),
+            (None, None, timedelta(days=randint(1, 30)), None),
+            (None, None, None, randint(1, 200)),
+        ]
+        for missing_input_case in missing_input_cases:
+            start_date, end_date, time_span, trading_time_span = missing_input_case
+            with self.assertRaises(ValueError):
+                # error should be raised prior to any schema/table correctness check
+                db_functions.calculate_fetch_time_bracket(
+                    "", "", start_date, end_date, time_span, trading_time_span)
+
         cases = [
             ("AAPL", "1day", "XNGS", True),
             ("USD/EUR", "1day", None, False),
             ("USD/EUR", "1min", None, False),
             ("AAPL", "1min", "XNGS", True)
         ]
+        for symbol, time_interval, mic, is_equity in cases:
+            schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+            table_name = f"{symbol}_{mic}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
+            inserted_data = self.prepare_table_for_case(
+                symbol=symbol, time_interval=time_interval,
+                mic=mic, is_equity=is_equity, inserted_rows=45
+            )
+            sub_cases = []
+            # (start of the data, end of the data)
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[0]['datetime_object'],
+                ending_timestamp=inserted_data[0]['datetime_object']
+            ))
+            # (date long prior to start of the data, date long after end of the data)
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(30, 90)),
+                ending_timestamp=inserted_data[0]['datetime_object'] + timedelta(days=randint(30, 90))
+            ))
+            # (middle of the data, middle of the data later)
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[randint(3, 10)]['datetime_object'],
+                ending_timestamp=inserted_data[randint(23, 30)]['datetime_object']
+            ))
+            # (date prior to start of the data, date prior to start of the data)
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(60, 70)),
+                ending_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(10, 15)),
+                raised_exception=db_functions.DataNotPresentError,
+            ))
+            # (date long after end of the data. date long after end of the data)
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(10, 15)),
+                ending_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(60, 70)),
+                raised_exception=db_functions.DataNotPresentError,
+            ))
+            # (weekend day, weekend day of next week) (special case for 1day timeframe)
+            if "day" in time_interval:
+                prior_weekday = next((
+                    day for day in t_helpers.generate_random_time_sample('1day', True, 45)
+                    if day['datetime_object'].isoweekday() == 5))['datetime_object']
+                prior_weekday += timedelta(days=1)
+                next_weekday = prior_weekday + timedelta(days=randint(1, 2))
+                sub_cases.extend(t_helpers.time_bracket_case_generator(
+                    reference_dataset=inserted_data,
+                    starting_timestamp=prior_weekday,
+                    ending_timestamp=next_weekday,
+                ))
+
+            # these are variations of cases nr 2 above:
+            # for example "give me data for 300 days timespan after this date", even when DB has like, 10 rows
+            # this should not be punished imo, just return what you have up to most recent moment
+            sub_cases.extend([
+                (inserted_data[0]['datetime_object'], None, None,
+                 len(inserted_data)*2, (0, len(inserted_data)-1), None),
+                (inserted_data[0]['datetime_object'], None, timedelta(days=randint(300, 500)),
+                 None, (0, len(inserted_data)-1), None),
+                (None, inserted_data[-1]['datetime_object'], None,
+                 len(inserted_data)*3, (0, len(inserted_data)-1), None),
+                (None, inserted_data[-1]['datetime_object'], None,
+                 len(inserted_data)*3, (0, len(inserted_data)-1), None),
+            ])
+
+            for sub_case in sub_cases:
+                start_date, end_date, time_span, trading_time_span, predicted_answer, raised_exception = sub_case
+                if raised_exception:
+                    with self.assertRaises(raised_exception):
+                        db_functions.calculate_fetch_time_bracket(
+                            schema_name, table_name, start_date, end_date, time_span, trading_time_span
+                        )
 
     @unittest.skip("this is a test stub")
     def test_get_data_from_view(self):
