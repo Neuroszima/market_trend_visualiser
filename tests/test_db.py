@@ -519,8 +519,8 @@ class DBTests(unittest.TestCase):
                 mic=mic, is_equity=is_equity, inserted_rows=25
             )
             sub_cases = []
+            print(*(str(d['datetime'])+"\n" for d in inserted_data))
             # (start of the data, end of the data)
-            print(*(str(d)+"\n" for d in inserted_data))
             sub_cases.extend(t_helpers.time_bracket_case_generator(
                 reference_dataset=inserted_data,
                 starting_timestamp=inserted_data[0]['datetime_object'],
@@ -539,19 +539,28 @@ class DBTests(unittest.TestCase):
                 ending_timestamp=inserted_data[randint(20, 24)]['datetime_object']
             ))
             # (date prior to start of the data, date prior to start of the data)
-            sub_cases.extend(t_helpers.time_bracket_case_generator(
+            c = t_helpers.time_bracket_case_generator(
                 reference_dataset=inserted_data,
                 starting_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(60, 70)),
                 ending_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(10, 15)),
                 raised_exception=db_functions.DataNotPresentError,
-            ))
+            )
+            # subcase with "end date too early" and "trading span" should not be allowed
+            # however, subcase with "start date too early" and "trading span" can be forgiven
+            # justification -> "just give 20 earliest datapoints, i'll give you just some stupid early date"
+            c.pop(3)  # 4th case in a list
+            sub_cases.extend(c)
             # (date long after end of the data. date long after end of the data)
-            sub_cases.extend(t_helpers.time_bracket_case_generator(
+            c = t_helpers.time_bracket_case_generator(
                 reference_dataset=inserted_data,
                 starting_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(10, 15)),
                 ending_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(60, 70)),
                 raised_exception=db_functions.DataNotPresentError,
-            ))
+            )
+            # simillar as above: "end date too late" and "trading span" combo can be allowed
+            # justification -> "just give 20 latest datapoints, i'll give you just some stupid late date"
+            c.pop()  # last in a list
+            sub_cases.extend(c)
             # (weekend day, weekend day of next week) (special case for 1day timeframe)
             if "day" in time_interval:
                 prior_weekday = next((
@@ -570,18 +579,18 @@ class DBTests(unittest.TestCase):
             # this should not be punished imo, just return what you have up to most recent moment
             sub_cases.extend([
                 (inserted_data[0]['datetime_object'], None, None,
-                 len(inserted_data)*2, (0, len(inserted_data)-1), None),
+                 len(inserted_data)*3, (0, len(inserted_data)*3-1), None),
                 (inserted_data[0]['datetime_object'], None, timedelta(days=randint(300, 500)),
                  None, (0, len(inserted_data)-1), None),
-                (None, inserted_data[-1]['datetime_object'], None,
-                 len(inserted_data)*3, (0, len(inserted_data)-1), None),
+                (None, inserted_data[-1]['datetime_object'], timedelta(days=randint(300, 500)),
+                 None, (0, len(inserted_data)-1), None),
                 (None, inserted_data[-1]['datetime_object'], None,
                  len(inserted_data)*3, (0, len(inserted_data)-1), None),
             ])
 
-            for sub_case in sub_cases:
+            for id_, sub_case in enumerate(sub_cases):
                 start_date, end_date, time_span, trading_time_span, predicted_answer, raised_exception = sub_case
-                message = f'test case failed: main:{case} sub: {sub_case}'
+                message = f'test case: {id_=}, main:{case} sub: {sub_case}'
                 print(message)
                 if raised_exception:
                     with self.assertRaises(raised_exception, msg=message):
@@ -593,6 +602,14 @@ class DBTests(unittest.TestCase):
                     schema_name, table_name, start_date, end_date, time_span, trading_time_span
                 )
                 self.assertEqual(predicted_answer, id_bracket_, msg=message)
+
+    @unittest.skip("this is a test stub")
+    def test_fetch_data_from_IDs(self):
+        pass
+
+    @unittest.skip("this is a test stub")
+    def test_fetch_data_from_timestamps(self):
+        pass
 
     @unittest.skip("this is a test stub")
     def test_get_data_from_view(self):

@@ -102,6 +102,10 @@ SELECT "ID" FROM "{schema_name}"."{table_name}" series
 where series.datetime {operation} TIMESTAMP '{search_date}' ORDER BY series.datetime {operation_order} LIMIT 1;
 """
 _query_get_point_by_ID = "SELECT * FROM \"{schema_name}\".\"{table_name}\" series WHERE series.\"ID\" = {id_}"
+_query_get_data_by_timestamps = """
+SELECT * FROM \"{schema_name}\".\"{table_name}\" series 
+WHERE series.datetime {earlier_bracket} {optional_and} {later_bracket} {optional_limit};
+"""
 
 
 @time_interval_sanitizer()
@@ -319,7 +323,7 @@ def calculate_fetch_time_bracket_(
         start_date: datetime | None = None, end_date: datetime | None = None,
         time_span: timedelta | None = None, trading_time_span: int | None = None):
     """
-    Calculates what should be the start and end date of a range for fetch function to work properly
+    Calculates what should be the start and end row ID range for fetch function to work properly
 
     Symbol, interval, is_equity and mic_code determine table to perform a search and optimizations.
     dates and time_span determine the approximate number of datapoints to fetch (by performing ID lookup)
@@ -329,52 +333,109 @@ def calculate_fetch_time_bracket_(
     because of Saturdays/Sundays/holidays, while latter will yield 90 trading days worth of data (up to today of course)
 
     If you provide multiple parameters, start_date and end_date will take precedence over passed time spans
+    Please save yourself a minute and don't use this function to actually fetch data XD.
     """
-    raise NotImplementedError("this function is not yet ready and is a stub")
+    # raise NotImplementedError("this function is not yet ready and is a stub")
     # decide if it is possible to form a bracket
-    # missing_count = [
-    #     not start_date, not end_date,
-    #     (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
-    # ].count(True)
-    # if missing_count > 1:
-    #     raise LookupError(
-    #         "At least 2 different parameters need to be passed to form a db lookup range, "
-    #         "that can be used to perform a database fetch. \nChoose one configuration:"
-    #         "(Two dates 'start-end'; One date, one interval)"
-    #     )
-    #
-    # # retrieve schema and table names
-    # # schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
-    # # table_name = f"{symbol}_{mic_code}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
-    #
-    # # calculate start and end of bracket, if datetime/timedelta was passed
-    # if start_date and time_span and (end_date is None):
-    #     end_date = start_date + time_span
-    # elif end_date and time_span and (start_date is None):
-    #     start_date = end_date - time_span
-    #
-    # earliest_id, latest_id = None, None
-    # # find ID of the item that is associated with the earliest possible datapoint closest to start_date
-    # if start_date:
-    #     earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation=">=")
-    # # find ID of the item that is associated with the latest possible datapoint closest to end_date
-    # if end_date:
-    #     latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation="<=")
-    #
-    # if (latest_id is None) and (trading_time_span is not None) and (earliest_id is not None):
-    #     latest_id = earliest_id + trading_time_span - 1
-    # if (earliest_id is None) and (trading_time_span is not None) and (latest_id is not None):
-    #     earliest_id = latest_id - trading_time_span + 1
-    #
-    # # print(not latest_id)
-    # # print(latest_id is None)
-    # # print(not earliest_id)
-    # # print(earliest_id is None)
-    # # print(trading_time_span is not None)
-    # # print(earliest_id)
-    # # print(latest_id)
-    #
-    # # return both data ID's as (earliest, latest) tuple
-    # assert earliest_id is not None and latest_id is not None, \
-    #     f"something went wrong with creating range: {earliest_id}, {latest_id}"
-    # return earliest_id, latest_id
+    missing_count = [
+        not start_date, not end_date,
+        (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
+    ].count(True)
+    if missing_count > 1:
+        raise LookupError(
+            "At least 2 different parameters need to be passed to form a db lookup range, "
+            "that can be used to perform a database fetch. \nChoose one configuration:"
+            "(Two dates 'start-end'; One date, one interval)"
+        )
+
+    # retrieve schema and table names
+    # schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+    # table_name = f"{symbol}_{mic_code}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
+
+    # calculate start and end of bracket, if datetime/timedelta was passed
+    if start_date and time_span and (end_date is None):
+        end_date = start_date + time_span
+    elif end_date and time_span and (start_date is None):
+        start_date = end_date - time_span
+
+    earliest_id, latest_id = None, None
+    # find ID of the item that is associated with the earliest possible datapoint closest to start_date
+    if start_date:
+        earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation=">=")
+    # find ID of the item that is associated with the latest possible datapoint closest to end_date
+    if end_date:
+        latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation="<=")
+
+    if (latest_id is None) and (trading_time_span is not None) and (earliest_id is not None):
+        latest_id = earliest_id + trading_time_span - 1
+    if (earliest_id is None) and (trading_time_span is not None) and (latest_id is not None):
+        earliest_id = latest_id - trading_time_span + 1
+
+    if earliest_id < 0:
+        earliest_id = 0
+
+    # return both data ID's as (earliest, latest) tuple
+    assert earliest_id is not None and latest_id is not None, \
+        f"something went wrong with creating range: {earliest_id}, {latest_id}"
+    return earliest_id, latest_id
+
+
+def fetch_data_(schema_name: str, table_name: str,
+        start_date: datetime | None = None, end_date: datetime | None = None,
+        time_span: timedelta | None = None, trading_time_span: int | None = None):
+    """get data from database based on timestamps, or additional information"""
+    raise NotImplementedError('function not tested, thus not ready to use')
+    # decide if it is possible to form a bracket
+    missing_count = [
+        not start_date, not end_date,
+        (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
+    ].count(True)
+    if missing_count > 1:
+        raise LookupError(
+            "At least 2 different parameters need to be passed to form a db lookup range, "
+            "that can be used to perform a database fetch. \nChoose one configuration:"
+            "(Two dates 'start-end'; One date, one interval)"
+        )
+
+    # calculate start and end of bracket, if datetime/timedelta was passed
+    if start_date and time_span and (end_date is None):
+        end_date = start_date + time_span
+    elif end_date and time_span and (start_date is None):
+        start_date = end_date - time_span
+
+    # optional number of datapoints
+    if trading_time_span:
+        optional_limit = f"LIMIT {trading_time_span}"
+    else:
+        optional_limit = ""
+
+    if start_date and end_date:
+        q = {
+            "earlier_bracket": f">= TIMESTAMP '{start_date}'",
+            "optional_and": "AND",
+            "later_bracket": f"<= TIMESTAMP '{end_date}'",
+        }
+    elif end_date is not None and trading_time_span is not None:
+        q = {
+            "earlier_bracket": "",
+            "optional_and": "",
+            "later_bracket": f"<= TIMESTAMP '{end_date}'",
+        }
+    elif start_date is not None and trading_time_span is not None:
+        q = {
+            "earlier_bracket": f">= TIMESTAMP '{start_date}'",
+            "optional_and": "",
+            "later_bracket": "",
+        }
+    else:
+        d = (schema_name, table_name, start_date, end_date, time_span, trading_time_span)
+        raise RuntimeError(f'something went wrong: {d}')
+
+    q["schema_name"] = schema_name
+    q["table_name"] = table_name
+    q["optional_limit"] = optional_limit
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_get_data_by_timestamps.format(**q))
+        data = cur.fetchall()
+    return data
