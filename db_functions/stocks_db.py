@@ -20,6 +20,10 @@ VALUES (
 );
 """
 
+# fetch queries
+_query_fetch_investment_types = "SELECT * FROM \"public\".investment_types i_ts {optional_filters};"
+_query_fetch_stocks = "SELECT * FROM \"public\".stocks_explained s {optional_filters};"
+
 
 def insert_investment_types_(equity_types):
     with psycopg2.connect(**_connection_dict) as conn:
@@ -58,3 +62,65 @@ def insert_stocks_(stocks: list[dict]):
                 raise e
             conn.commit()
         cur.close()
+
+
+def fetch_investment_types_(name_like: str | None = None):
+    """
+    Obtain a list of investment/equity types that resides in database
+
+    Additional options allow for similarities to be searched for "equity type name" (example being 'Common Stock')
+    Add '%' in front or in the end of parameter to increase the likelihood of finding results
+    """
+    optional_filter = f"WHERE i_ts.name LIKE '{name_like}'" if name_like else ""
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_fetch_investment_types.format(
+            optional_filters=optional_filter,
+        ))
+        f_gs = cur.fetchall()
+    return f_gs
+
+
+def fetch_stocks_(
+        symbol_like: str | None = None, name_like: str | None = None,
+        currency_symbol_like: str | None = None, market_identification_code_like: str | None = None,
+        country_name_like: str | None = None, investment_type_name_like: str | None = None,
+        access_plan_name_like: str | None = None):
+    """
+    Obtain a list of currencies that resides in database (using prepared view)
+    Add '%' in front or in the end of parameter to increase the likelihood of finding results
+
+    Additional options allow for similarities to be searched for, for example investment type name
+    and "mic" symbol, as the exchange at which instrument is traded.
+    Defaults to yielding entire stored information at once.
+    (using view -> it substitutes raw relation ID's for human-readable content)
+    """
+    filter_map = {
+        "s.symbol LIKE '{}'": symbol_like,
+        "s.name LIKE '{}'": name_like,
+        "s.currency_symbol LIKE '{}'": currency_symbol_like,
+        "s.exchange_mic_code LIKE '{}'": market_identification_code_like,
+        "s.country_name LIKE '{}'": country_name_like,
+        "s.investment_type LIKE '{}'": investment_type_name_like,
+        "s.access_plan LIKE '{}'": access_plan_name_like,
+    }
+    if any([value == '' for _, value in filter_map.items()]):
+        raise ValueError('empty values passed as "" are not valid for the query')
+    used_filters = [
+        key.format(value) for key, value in filter_map.items() if value is not None
+    ]
+    if len(used_filters) >= 2:
+        optional_filters = "WHERE " + "AND ".join(used_filters)
+    elif len(used_filters) == 1:
+        optional_filters = "WHERE " + used_filters[0]
+    else:
+        optional_filters = ""
+
+    with psycopg2.connect(**_connection_dict) as conn:
+        cur = conn.cursor()
+        cur.execute(_query_fetch_stocks.format(
+            optional_filters=optional_filters,
+        ))
+        f_ps = cur.fetchall()
+    return f_ps
+

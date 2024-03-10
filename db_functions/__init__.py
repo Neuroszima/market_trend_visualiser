@@ -28,6 +28,8 @@ fetch_timezones: Callable = markets_db.fetch_timezones_
 
 insert_stocks: Callable = stocks_db.insert_stocks_
 insert_investment_types: Callable = stocks_db.insert_investment_types_
+fetch_investment_types: Callable = stocks_db.fetch_investment_types_
+fetch_stocks: Callable = stocks_db.fetch_stocks_
 
 create_time_series: Callable = time_series_db.create_time_series_
 time_series_latest_timestamp: Callable[[str, str, bool, str | None], datetime] = \

@@ -29,7 +29,7 @@ _query_fetch_countries = "SELECT * FROM public.\"countries\" c {optional_filter}
 _query_fetch_plans = "SELECT * FROM public.\"plans\" p {optional_filter};"
 
 
-def insert_countries_(countries: set):
+def insert_countries_(countries: set[str]):
     """
     insert information about countries, that is obtained from TwelveData API provider.
 
@@ -70,7 +70,7 @@ def insert_plans_(plans: set[str]):
     """
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        for index, plan in enumerate(plans):
+        for index, plan in enumerate(sorted(plans)):
             query_start = literal_eval(plan)
             query_dict = dict()
             for key in query_start:
@@ -84,7 +84,7 @@ def insert_plans_(plans: set[str]):
 def insert_markets_(markets: list[dict]):
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        for index, market in enumerate(markets):
+        for index, market in enumerate(sorted(markets, key=lambda x: x['name'])):
             country = market['country']
             if country == "":
                 country = "Unknown"
@@ -127,6 +127,8 @@ def fetch_markets_(
         "m.access_plan LIKE '{}'": plan_name_like,
         "m.country_name LIKE '{}'": country_name_like,
     }
+    if any([value == '' for _, value in filter_map.items()]):
+        raise ValueError('empty values passed as "" are not valid for the query')
     used_filters = [
         key.format(value) for key, value in filter_map.items() if value is not None
     ]
@@ -152,7 +154,9 @@ def fetch_timezones_(name_like: str | None = None):
     Additional options allow for similarities to be searched for namely "name" param
     Add '%' in front or in the end of parameter to increase the likelihood of finding results
     """
-    optional_filter = f"WHERE t.name LIKE '{name_like}'"
+    if name_like == "":
+        raise ValueError('empty values passed as "" are not valid for the query')
+    optional_filter = f"WHERE t.name LIKE '{name_like}'" if name_like else ""
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         cur.execute(_query_fetch_timezones.format(
@@ -169,7 +173,9 @@ def fetch_countries_(name_like: str | None = None):
     Additional options allow for similarities to be searched for namely "name" param
     Add '%' in front or in the end of parameter to increase the likelihood of finding results
     """
-    optional_filter = f"WHERE c.name LIKE '{name_like}'"
+    if name_like == "":
+        raise ValueError('empty values passed as "" are not valid for the query')
+    optional_filter = f"WHERE c.name LIKE '{name_like}'" if name_like else ""
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         cur.execute(_query_fetch_countries.format(
@@ -186,7 +192,9 @@ def fetch_plans_(plan_name_like: str | None = None):
     Additional options allow for similarities to be searched for namely "name" param
     Add '%' in front or in the end of parameter to increase the likelihood of finding results
     """
-    optional_filter = f"WHERE p.name LIKE '{plan_name_like}'"
+    if plan_name_like == "":
+        raise ValueError('empty values passed as "" are not valid for the query')
+    optional_filter = f"WHERE p.plan LIKE '{plan_name_like}'" if plan_name_like else ""
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         cur.execute(_query_fetch_plans.format(

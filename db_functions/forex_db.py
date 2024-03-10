@@ -57,7 +57,7 @@ def insert_forex_pairs_available_(pairs: list[dict]):
     """fill currencies table with all the tradeable currency pairs covered by TwelveData API"""
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        for index, pair_dict in enumerate(pairs):
+        for index, pair_dict in enumerate(sorted(pairs, key=lambda x: x['symbol'])):
             base_symbol, quote_symbol = pair_dict['symbol'].split("/")
             query_dict = {
                 "index": index,
@@ -80,6 +80,9 @@ def fetch_currencies_(symbol_like: str | None = None, name_like: str | None = No
     (meaning it substitutes raw relation ID's for meaningful names)
     Add '%' in front or in the end of parameter to increase the likelihood of finding results
     """
+    print(symbol_like, name_like)
+    if name_like == "" or symbol_like == "":
+        raise ValueError('empty values passed as "" are not valid for the query')
     optional_filter_1 = f"c.symbol LIKE '{symbol_like}'" if symbol_like else ""
     optional_filter_2 = f"c.name LIKE '{name_like}'" if name_like else ""
     if optional_filter_1 and optional_filter_2:
@@ -106,7 +109,9 @@ def fetch_forex_currency_groups_(name_like: str | None = None):
     Additional options allow for similarities to be searched for "currency group name" (example being 'Exotic')
     Add '%' in front or in the end of parameter to increase the likelihood of finding results
     """
-    optional_filter = f"WHERE f_c_g.name LIKE '{name_like}'"
+    if name_like == "":
+        raise ValueError('empty values passed as "" are not valid for the query')
+    optional_filter = f"WHERE f_c_g.name LIKE '{name_like}'" if name_like else ""
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         cur.execute(_query_fetch_currency_groups.format(
@@ -136,6 +141,8 @@ def fetch_forex_pairs_(
         "f_p.base_currency_name LIKE '{}'": currency_base_name_like,
         "f_p.quote_currency_name LIKE '{}'": currency_quote_name_like,
     }
+    if any([value == '' for _, value in filter_map.items()]):
+        raise ValueError('empty values passed as "" are not valid for the query')
     used_filters = [
         key.format(value) for key, value in filter_map.items() if value is not None
     ]
