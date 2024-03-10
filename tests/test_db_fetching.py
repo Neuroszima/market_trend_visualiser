@@ -269,7 +269,6 @@ class DBFetchTests(unittest.TestCase):
                 )
                 self.assertEqual(predicted_answer, id_bracket_, msg=message)
 
-    # TODO - tests for miscellaneous fetching functions here
     def test_fetch_currencies(self):
         currency_list = [
             (0, "Argentinian Peso", "ARS"), (1, "Brazil Real", "BRL"),
@@ -309,23 +308,31 @@ class DBFetchTests(unittest.TestCase):
             self.assertFetchCaseCompliant([case[0]], db_functions.fetch_forex_currency_groups, case[-1], groups_list)
 
     def test_fetch_forex_pairs(self):
+        """
+        Test forex pairs available in database
+        There are 6 different filters here, 2 currency symbols (quote, base), their respective names,
+        the entire symbol of a pair (one with "/" in it) and the name of currency group
+        """
         forex_pairs = [
-            (0, "Exotic-Cross", "AED/BRL", "AED", "BRL", "UAE Dirham", "Brazil Real"),
-            (1, "Exotic-Cross", "JPY/ZAR", "JPY", "ZAR", "Japanese Yen", "South African Rand"),
-            (2, "Exotic", "ARS/USD", "ARS", "USD", "Argentinian Peso", "US Dollar"),
-            (3, "Minor", "KGS/RUB", "KGS", "RUB", "Kyrgyzstan som", "Russian Ruble"),
-            (4, "Major", "USD/EUR", "USD", "EUR", "US Dollar", "Euro"),
-            (5, "Major", "USD/GBP", "USD", "GBP", "US Dollar", "British Pound"),
-            (6, "Major", "USD/JPY", "USD", "JPY", "US Dollar", "Japanese Yen"),
+            (0, 'Exotic-Cross', 'AED/BRL', 'AED', 'BRL', 'UAE Dirham', 'Brazil Real'),
+            (1, 'Exotic', 'ARS/USD', 'ARS', 'USD', 'Argentinian Peso', 'US Dollar'),
+            (2, 'Exotic-Cross', 'JPY/ZAR', 'JPY', 'ZAR', 'Japanese Yen', 'South African Rand'),
+            (3, 'Minor', 'KGS/RUB', 'KGS', 'RUB', 'Kyrgyzstan som', 'Russian Ruble'),
+            (4, 'Major', 'USD/EUR', 'USD', 'EUR', 'US Dollar', 'Euro'),
+            (5, 'Major', 'USD/GBP', 'USD', 'GBP', 'US Dollar', 'British Pound'),
+            (6, 'Major', 'USD/JPY', 'USD', 'JPY', 'US Dollar', 'Japanese Yen')
         ]
         cases = [
             ('M%', None, None, None, None, None, [3, 4, 5, 6]),
+            (None, None, None, "%PY", None, None, [6]),
             (None, None, None, None, '%Dollar%', '%Pound%', [5]),
             (None, None, 'USD', None, None, None, [4, 5, 6]),
             (None, 'USD%', None, None, None, None, [4, 5, 6]),
             ('E%', None, None, None, None, None, [0, 1, 2]),
-            ('E%', None, None, None, None, None, [0, 1, 2]),
+            ('Exotic', None, None, None, None, None, [1]),
             ("Major", None, None, "GBP", None, None, [5]),
+            ("Major", None, None, None, "X Dollar", "Y peso", []),
+            (*[None]*6, [fp[0] for fp in forex_pairs]),
             *[(*[field for field in forex_pairs[index][1:]], [index]) for index in range(len(forex_pairs))]
         ]
         cases.extend([([None if j != i else '' for j in range(6)] + [ValueError]) for i in range(len(forex_pairs[0])-1)])
@@ -333,6 +340,10 @@ class DBFetchTests(unittest.TestCase):
             self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_forex_pairs, case[-1], forex_pairs)
 
     def test_fetch_plans(self):
+        """
+        For this test we only check the 'name' of the plan which is the 'plan' field in DB.
+        This is the only parameter exposed to be filtered in the function.
+        """
         plans = [
             (0, 'Basic', 'Basic'), (1, 'Level C', 'Enterprise'),
             (2, 'Level A', 'Grow'), (3, 'Level B', 'Pro')
@@ -349,26 +360,132 @@ class DBFetchTests(unittest.TestCase):
         for case in cases:
             self.assertFetchCaseCompliant([case[0]], db_functions.fetch_plans, case[-1], plans)
 
-    @unittest.skip("this is a test stub")
     def test_fetch_markets(self):
-        pass
+        markets = [
+            (0, 'BHB', 'XBAH', 'Asia/Bahrain', 'Enterprise', 'Bahrain'),
+            (1, 'LSE', 'XLON', 'Europe/London', 'Grow', 'United Kingdom'),
+            (2, 'NASDAQ', 'XNGS', 'America/New_York', 'Basic', 'United States'),
+            (3, 'NASDAQ', 'XNMS', 'America/New_York', 'Basic', 'United States'),
+            (4, 'OTC', 'PINX', 'America/New_York', 'Basic', 'United States'),
+            (5, 'SZSE', 'XSHE', 'Asia/Shanghai', 'Pro', 'China')
+        ]
+        cases = [
+            ('NAS%', None, None, None, None, [2, 3]),
+            (None, None, None, "Basic", None, [2, 3, 4]),
+            ("B%", None, None, '%Enterprise%', None, [0]),
+            (None, None, 'Asia%', None, None, [0, 5]),
+            (None, 'X%', None, None, None, [0, 1, 2, 3, 5]),
+            ('%E%', None, None, None, None, [1, 5]),
+            ('E%', None, None, None, None, []),
+            (None, None, "%New_York", None, None, [2, 3, 4]),
+            (None, None, "%New York", None, None, []),  # they probably do not allow spaces in 2 segment names
+            (None, None, None, None, "%States", [2, 3, 4]),
+            ("Euroxnet", None, None, None, "%States", []),
+            (*[None]*5, [fp[0] for fp in markets]),
+            *[(*[field for field in markets[index][1:]], [index]) for index in range(len(markets))]
+        ]
+        cases.extend([([None if j != i else '' for j in range(5)] + [ValueError]) for i in range(len(markets[0])-1)])
+        for case in cases:
+            print(case)
+            self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_markets, case[-1], markets)
 
-    @unittest.skip("this is a test stub")
+
     def test_fetch_countries(self):
-        pass
+        """Test countries available in database. Fetch filter is name of country"""
+        countries = [
+            (0, "Bahrain"), (1, "China"), (2, "United Kingdom"),
+            (3, "United States"), (4, "Unknown"),
+        ]
+        cases = [
+            ('', ValueError),
+            (None, [p[0] for p in countries]),
+            *[(*[field for field in countries[index][1:]], [index]) for index in range(len(countries))],
+            ('%a%', [0, 1, 3]),
+            ('B%', [0]),
+            ('U%', [2, 3, 4]),
+            ('United%', [2, 3]),
+            ('%own', [4]),
+            ('X', []),
+        ]
+        for case in cases:
+            self.assertFetchCaseCompliant([case[0]], db_functions.fetch_countries, case[-1], countries)
 
-    @unittest.skip("this is a test stub")
     def test_fetch_timezones(self):
-        pass
+        """
+        Test countries available in database. Fetch filter is name of country
+        Technically we could use them to change the date timestamps of incoming time series data,
+        but we only do have them for archive purposes and relational database things
+        """
+        timezones = [
+            (0, "America/New_York"),
+            (1, "Asia/Bahrain"),
+            (2, "Asia/Shanghai"),
+            (3, "Europe/London"),
+        ]
+        cases = [
+            ('', ValueError),
+            (None, [p[0] for p in timezones]),
+            *[(*[field for field in timezones[index][1:]], [index]) for index in range(len(timezones))],
+            ('%a%', [0, 1, 2]),
+            ('Asia%', [1, 2]),
+            ('U%', []),
+            ('A%', [0, 1, 2]),
+            ('E%', [3]),
+            ('%Bahrain', [1]),
+            ('X', []),
+        ]
+        for case in cases:
+            self.assertFetchCaseCompliant([case[0]], db_functions.fetch_timezones, case[-1], timezones)
 
-    @unittest.skip("this is a test stub")
     def test_fetch_investment_types(self):
-        pass
+        types = [
+            (0, "Common Stock"),
+            (1, "ETF"),
+            (2, "Exchange-Traded Note"),
+        ]
+        cases = [
+            ('', ValueError),
+            (None, [p[0] for p in types]),
+            *[(*[field for field in types[index][1:]], [index]) for index in range(len(types))],
+            ('%o%', [0, 2]),
+            ('E%', [1, 2]),
+            ('%Stock', [0]),
+            ('ETF', [1]),
+            ('X', []),
+            ('x', []),
+        ]
+        for case in cases:
+            self.assertFetchCaseCompliant([case[0]], db_functions.fetch_investment_types, case[-1], types)
 
-    @unittest.skip("this is a test stub")
     def test_fetch_stocks(self):
-        pass
+        stocks = [
+            (0, 'AADV', 'Albion Development VCT PLC', 'GBP', 'XLON', 'United Kingdom', 'Common Stock', 'Grow'),
+            (1, 'AAPL', 'Apple Inc', 'USD', 'XNGS', 'United States', 'Common Stock', 'Basic'),
+            (2, 'ABLLL', 'Abacus Life, Inc.', 'USD', 'XNMS', 'United States', 'Exchange-Traded Note', 'Basic'),
+            (3, 'BKISF', 'ISHARES IV PLC', 'USD', 'PINX', 'United States', 'ETF', 'Basic'),
+            (4, 'NVDA', 'NVIDIA Corp', 'USD', 'XNGS', 'United States', 'Common Stock', 'Basic'),
+            (5, 'OTEX', 'Open Text Corp', 'USD', 'XNGS', 'United States', 'Common Stock', 'Basic'),
+        ]
+        cases = [
+            ('M%', None, None, None, None, None, None, []),
+            (None, "%Inc%", None, None, None, None, None, [1, 2]),
+            (None, "%PLC", None, None, None, None, None, [0, 3]),
+            (None, None, 'USD', None, None, None, None, [1, 2, 3, 4, 5]),
+            (None, None, 'GBP', None, None, None, None, [0]),
+            (None, None, 'USD', 'X%', None, None, None, [1, 2, 4, 5]),
+            (None, None, None, None, '%Kingdom', None, None, [0]),
+            ('A%', None, None, None, None, "%Note", None, [2]),
+            (None, None, None, None, None, "Common Stock", None, [0, 1, 4, 5]),
+            (None, None, None, None, None, "ETF", None, [3]),
+            (None, None, None, None, None, None, "Basic", [i+1 for i in range(5)]),
+            (*[None]*7, [s[0] for s in stocks]),
+            *[(*[field for field in stocks[index][1:]], [index]) for index in range(len(stocks))]
+        ]
+        cases.extend([([None if j != i else '' for j in range(7)] + [ValueError]) for i in range(len(stocks[0])-1)])
+        for case in cases:
+            self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_stocks, case[-1], stocks)
 
+    # TODO - tests for time series fetching functions here
     @unittest.skip("this is a test stub")
     def test_fetch_datapoint_by_date(self):
         pass
@@ -386,3 +503,5 @@ class DBFetchTests(unittest.TestCase):
         pass
 
 
+if __name__ == '__main__':
+    unittest.main()

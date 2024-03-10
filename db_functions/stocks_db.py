@@ -38,7 +38,7 @@ def insert_investment_types_(equity_types):
 def insert_stocks_(stocks: list[dict]):
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        for index, stock in enumerate(stocks):
+        for index, stock in enumerate(sorted(stocks, key=lambda s: s["symbol"])):
             if index % 1000 == 0:
                 print(index)
             if stock["country"] == "":
@@ -71,6 +71,8 @@ def fetch_investment_types_(name_like: str | None = None):
     Additional options allow for similarities to be searched for "equity type name" (example being 'Common Stock')
     Add '%' in front or in the end of parameter to increase the likelihood of finding results
     """
+    if name_like == "":
+        raise ValueError('empty values passed as "" are not valid for the query')
     optional_filter = f"WHERE i_ts.name LIKE '{name_like}'" if name_like else ""
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()

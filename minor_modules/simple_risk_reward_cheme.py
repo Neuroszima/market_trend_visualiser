@@ -108,6 +108,6 @@ strategy expectancy (x interest rate): {interest_rate}
 
 print(text_analisys)
 
-with open(f'simple_management_chance_{c}_reward_{reward_factor}'.replace('.', '_') + '.txt', 'w',
+with open(f'build\simple_management_chance_{c}_reward_{reward_factor}'.replace('.', '_') + '.txt', 'w',
           encoding="UTF-8", newline='\n') as money_management_file:
     money_management_file.write(text_analisys)

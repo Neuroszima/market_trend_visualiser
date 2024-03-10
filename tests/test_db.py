@@ -21,7 +21,7 @@ class DBTests(unittest.TestCase):
             cur = conn.cursor()
             cur.execute(helpers._table_rows_quantity.format(schema=schema_name, table_name=table_name))
             result = cur.fetchall()
-            self.assertEqual(result[0][0], correct_num_of_rows)
+            self.assertEqual(correct_num_of_rows, result[0][0])
 
     def assertTableExist(self, table_name: str, schema_name: str):
         with psycopg2.connect(**helpers._connection_dict) as conn:
@@ -113,6 +113,10 @@ class DBTests(unittest.TestCase):
             {'name': 'LSE', 'code': 'XLON', 'country': 'United Kingdom', 'timezone': 'Europe/London',
              'access': {'global': 'Level A', 'plan': 'Grow'}},
             {'name': 'NASDAQ', 'code': 'XNGS', 'country': 'United States', 'timezone': 'America/New_York',
+             'access': {'global': 'Basic', 'plan': 'Basic'}},
+            {'name': 'NASDAQ', 'code': 'XNMS', 'country': 'United States', 'timezone': 'America/New_York',
+             'access': {'global': 'Basic', 'plan': 'Basic'}},
+            {'name': 'OTC', 'code': 'PINX', 'country': 'United States', 'timezone': 'America/New_York',
              'access': {'global': 'Basic', 'plan': 'Basic'}}
         ]
 
@@ -158,6 +162,12 @@ class DBTests(unittest.TestCase):
              'access': {'global': 'Basic', 'plan': 'Basic'}},
             {'symbol': 'OTEX', 'name': 'Open Text Corp', 'currency': 'USD', 'exchange': 'NASDAQ',
              'mic_code': 'XNGS', 'country': 'United States', 'type': 'Common Stock',
+             'access': {'global': 'Basic', 'plan': 'Basic'}},
+            {'symbol': 'ABLLL', 'name': 'Abacus Life, Inc.', 'currency': 'USD', 'exchange': 'NASDAQ',
+             'mic_code': 'XNMS', 'country': 'United States', 'type': 'Exchange-Traded Note',
+             'access': {'global': 'Basic', 'plan': 'Basic'}},
+            {'symbol': 'BKISF', 'name': 'ISHARES IV PLC', 'currency': 'USD', 'exchange': 'CTC',
+             'mic_code': 'PINX', 'country': 'United States', 'type': 'ETF',
              'access': {'global': 'Basic', 'plan': 'Basic'}}
         ]
 
@@ -207,7 +217,7 @@ class DBTests(unittest.TestCase):
         self.assertDatabaseHasRows('public', "timezones", 4)
         self.assertDatabaseHasRows('public', "countries", 5)  # additional country of 'Unknown' is present in db
         self.assertDatabaseHasRows('public', "plans", 4)  # every single that TwelveData has in paid plans offer
-        self.assertDatabaseHasRows('public', "markets", 4)
+        self.assertDatabaseHasRows('public', "markets", 6)
 
     def test_save_equities(self):
         """
@@ -217,8 +227,8 @@ class DBTests(unittest.TestCase):
         self.save_markets_sample()
         # following is NOT independent on previous 2
         data_saved = self.save_equities_sample()  # only this data will be checked
-        self.assertDatabaseHasRows('public', 'investment_types', 1)
-        self.assertDatabaseHasRows('public', 'stocks', 4)
+        self.assertDatabaseHasRows('public', 'investment_types', 3)
+        self.assertDatabaseHasRows('public', 'stocks', 6)
 
     def test_is_stock(self):
         """look at stock checking functionality (database function)"""
