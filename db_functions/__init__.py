@@ -55,3 +55,4 @@ is_stock: Callable[[str], bool] = db_helpers.is_stock_
 TimeSeriesNotFoundError: type[Exception] = db_helpers.TimeSeriesNotFoundError_
 TimeSeriesExistsError: type[Exception] = db_helpers.TimeSeriesExistsError_
 DataNotPresentError: type[Exception] = db_helpers.DataNotPresentError_
+DataUncertainError: type[Exception] = db_helpers.DataUncertainError_

@@ -302,6 +302,7 @@ class APITests(unittest.TestCase):
         self.assertEqual(processed_start, start)
         self.assertEqual(processed_end, datetime(2023, 1, 1, 15, 59))
 
+    # TODO - look Expected :1169 Actual :1111
     def test_download_time_series(self):
         """
         test aims to download a set amount of points for both currency pair and equity
@@ -366,6 +367,7 @@ class APITests(unittest.TestCase):
         for p in series_example2['values']:
             self.assertConformsDataResponse(data_responses.time_series_1day_forex, p)
 
+    # TODO - look Expected :66029 Actual :66151  error
     def test_equity_history_download(self):
         """
         test downloading data since arbitrary date up to arbitrary date, of currency pair or equity ticker

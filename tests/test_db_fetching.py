@@ -3,10 +3,7 @@ from datetime import datetime, timedelta
 from random import choices, randint, random
 from typing import Callable
 
-# import psycopg2
-
 import db_functions.db_helpers as helpers
-# from db_functions.time_series_db import _drop_time_table, _drop_forex_table
 import db_functions
 import tests.test_db as test_db
 import tests.t_helpers as t_helpers
@@ -389,7 +386,6 @@ class DBFetchTests(unittest.TestCase):
             print(case)
             self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_markets, case[-1], markets)
 
-
     def test_fetch_countries(self):
         """Test countries available in database. Fetch filter is name of country"""
         countries = [
@@ -486,13 +482,90 @@ class DBFetchTests(unittest.TestCase):
             self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_stocks, case[-1], stocks)
 
     # TODO - tests for time series fetching functions here
-    @unittest.skip("this is a test stub")
     def test_fetch_datapoint_by_date(self):
-        pass
+        """
+        test fetching a single point of time from database by date
+        other information consist of timeframe, stock symbol, market id code and such
+        """
 
-    @unittest.skip("this is a test stub")
+        # two rows with the same date should not happen!
+        dummy_data = self.prepare_table_for_case("AAAPL", "1day", is_equity=True, mic="XNGS")
+        db_functions.insert_historical_data(
+            dummy_data, "AAAPL", "1day", is_equity=True, mic_code="XNGS", rownum_start=2)
+        with self.assertRaises(db_functions.DataUncertainError):
+            db_functions.fetch_datapoint_by_date(dummy_data[0]['datetime_object'], "AAAPL", "1day", True, "XNGS")
+
+        cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
+        for symbol_, time_interval, mic, is_equity in cases:
+            if time_interval in ['1day']:
+                time_conversion = '%Y-%m-%d'
+            elif time_interval in ['1min']:
+                time_conversion = '%Y-%m-%d %H:%M:%S'
+            time_series = self.prepare_table_for_case(symbol_, time_interval, is_equity, mic, inserted_rows=25)
+            start = time_series[0]
+            end = time_series[-1]
+            middle = time_series[randint(1, 23)]
+            start_fetch = db_functions.fetch_datapoint_by_date(
+                start["datetime_object"], symbol_, time_interval, is_equity, mic)
+            end_fetch = db_functions.fetch_datapoint_by_date(
+                end["datetime_object"], symbol_, time_interval, is_equity, mic)
+            middle_fetch = db_functions.fetch_datapoint_by_date(
+                middle["datetime_object"], symbol_, time_interval, is_equity, mic)
+            for pair in [(start, start_fetch), (end, end_fetch), (middle, middle_fetch)]:
+                self.assertEqual(datetime.strptime(pair[0]['datetime'], time_conversion), pair[1][1])
+                self.assertEqual(pair[0]['open'], pair[1][2])
+                self.assertEqual(pair[0]['close'], pair[1][3])
+                self.assertEqual(pair[0]['high'], pair[1][4])
+                self.assertEqual(pair[0]['low'], pair[1][5])
+                if is_equity:
+                    self.assertEqual(pair[0]['volume'], pair[1][6])
+
     def test_fetch_datapoint_raw_by_pk(self):
-        pass
+        cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
+        for symbol_, time_interval, mic, is_equity in cases:
+            schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+            table_name = f"{symbol_}_{mic}" if is_equity else "%s_%s_%s" % (*symbol_.split("/"), time_interval)
+            if time_interval in ['1day']:
+                time_conversion = '%Y-%m-%d'
+            elif time_interval in ['1min']:
+                time_conversion = '%Y-%m-%d %H:%M:%S'
+            random_table_length = randint(25, 75)
+            random_point = randint(1, random_table_length-3)
+            time_series = self.prepare_table_for_case(symbol_, time_interval, is_equity, mic, inserted_rows=random_table_length)
+            start = time_series[0]
+            end = time_series[-1]
+            middle = time_series[random_point]
+
+            # all the following fetch responses come in a list of only 1 element...
+            start_fetch = db_functions.fetch_datapoint_raw_by_pk(0, table_name, schema_name)
+            end_fetch = db_functions.fetch_datapoint_raw_by_pk(
+                random_table_length-1, table_name, schema_name)
+            middle_fetch = db_functions.fetch_datapoint_raw_by_pk(random_point, table_name, schema_name)
+            subcases = [
+                (0, start, start_fetch),
+                (random_table_length - 1, end, end_fetch),
+                (random_point, middle, middle_fetch)
+            ]
+            for sub_case in subcases:
+                self.assertEqual(sub_case[0],
+                                 sub_case[2][0])  # "ID" equivalence
+                self.assertEqual(datetime.strptime(sub_case[1]['datetime'], time_conversion), sub_case[2][1])
+                self.assertEqual(sub_case[1]['open'], sub_case[2][2])
+                self.assertEqual(sub_case[1]['close'], sub_case[2][3])
+                self.assertEqual(sub_case[1]['high'], sub_case[2][4])
+                self.assertEqual(sub_case[1]['low'], sub_case[2][5])
+                if is_equity:
+                    self.assertEqual(sub_case[1]['volume'], sub_case[2][6])
 
     @unittest.skip("this is a test stub")
     def test_fetch_data_from_IDs(self):

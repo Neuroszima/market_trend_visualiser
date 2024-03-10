@@ -41,6 +41,10 @@ class DataNotPresentError_(Exception):
     pass
 
 
+class DataUncertainError_(Exception):
+    pass
+
+
 # functions
 def db_string_converter_(string: str):
     """format query parameter that needs to have a special characters in it"""

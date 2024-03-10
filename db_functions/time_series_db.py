@@ -9,7 +9,8 @@ from db_functions.db_helpers import (
     _information_schema_table_check,
     db_string_converter_,
     TimeSeriesNotFoundError_,
-    DataNotPresentError_
+    DataNotPresentError_,
+    DataUncertainError_
 )
 from minor_modules import time_interval_sanitizer
 
@@ -267,7 +268,7 @@ def fetch_datapoint_raw_by_pk_(id_: int, table_name: str, schema_name: str) -> t
 
 
 def fetch_datapoint_by_date_(
-        symbol: str, time_interval: str, date: datetime | str, is_equity: bool, mic_code: str | None = None):
+        date: datetime | str, symbol: str, time_interval: str,  is_equity: bool, mic_code: str | None = None):
     """
     Obtain a point from database based on timestamp
     For now we require absolute precision in terms of selecting dates. If you fail to pass a date,
@@ -292,7 +293,9 @@ def fetch_datapoint_by_date_(
         res = cur.fetchall()
     if not res:
         raise DataNotPresentError_(f"There is no point in data that is associated with date: {date}")
-    return res
+    if len(res) > 1:
+        raise DataUncertainError_("there is more than one point with that date in timeseries!")
+    return res[0]
 
 
 def locate_closest_datapoint_(
