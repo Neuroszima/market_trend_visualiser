@@ -1,7 +1,10 @@
 import unittest
 from datetime import datetime, timedelta
-from random import choices, randint, random
+from random import choices, randint
 from typing import Callable
+
+import psycopg2
+from psycopg2.errors import UndefinedTable
 
 import db_functions.db_helpers as helpers
 import db_functions
@@ -21,7 +24,7 @@ class DBFetchTests(unittest.TestCase):
             list_of_database_contents: list):
         msg = f'failed: {fetch_filter_arguments} {fetch_function}'
         if isinstance(possible_result, type):  # exception
-            with self.assertRaises(possible_result, msg=f'raising %s' % msg):
+            with self.assertRaises(possible_result, msg=f'raising %s' % msg):  # noqa
                 fetch_function(*fetch_filter_arguments)
             return
         fetch_result = fetch_function(*fetch_filter_arguments)
@@ -30,12 +33,51 @@ class DBFetchTests(unittest.TestCase):
             for entry in possible_result:
                 self.assertIn(list_of_database_contents[entry], fetch_result)
 
+    def assertDatabaseAssumedRowsNumber(self, schema_name: str, table_name: str, data_length: int):
+        with psycopg2.connect(**helpers._connection_dict) as conn:
+            cur = conn.cursor()
+            cur.execute(helpers._table_rows_quantity.format(schema=schema_name, table_name=table_name))
+            result = cur.fetchall()
+            self.assertEqual(result[0][0], data_length)
+
+    def assertCandleMatchesData(
+            self, fetched_candle: tuple, data_candle: dict, time_string_conversion: str, is_equity: bool):
+        try:
+            self.assertEqual(
+                datetime.strptime(data_candle['datetime'], time_string_conversion), fetched_candle[1])
+            self.assertEqual(data_candle['open'], fetched_candle[2])
+            self.assertEqual(data_candle['close'], fetched_candle[3])
+            self.assertEqual(data_candle['high'], fetched_candle[4])
+            self.assertEqual(data_candle['low'], fetched_candle[5])
+            if is_equity:
+                self.assertEqual(data_candle['volume'], fetched_candle[6])
+        except AssertionError as e:
+            print(e)
+            raise AssertionError(f'candle do not match data: f={fetched_candle} d={data_candle}')
+
     def prepare_table_for_case(self, symbol: str, time_interval: str, is_equity: bool, mic: str, inserted_rows=1):
         """prepare a series of operations for testing database functions"""
         db_functions.create_time_series(symbol, time_interval, is_equity, mic_code=mic)
         dummy_data = t_helpers.generate_random_time_sample(time_interval, is_equity, span=inserted_rows)
         db_functions.insert_historical_data(dummy_data, symbol, time_interval, is_equity=is_equity, mic_code=mic)
         return dummy_data
+
+    def form_test_essentials(self, symbol_: str, time_interval: str, mic: str, is_equity: bool) -> tuple:
+        """
+        prepare schema_name, table_name, time_conversion strings that are consumed in tests frequently
+        based on common test starting conditions
+
+        :return: schema_name, table_name, time_conversion
+        """
+        schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+        table_name = f"{symbol_}_{mic}" if is_equity else "%s_%s_%s" % (*symbol_.split("/"), time_interval)  # noqa
+        if time_interval in ['1day']:
+            time_conversion = '%Y-%m-%d'
+        elif time_interval in ['1min']:
+            time_conversion = '%Y-%m-%d %H:%M:%S'
+        else:
+            raise ValueError(time_interval)
+        return schema_name, table_name, time_conversion
 
     def save_samples_for_tests(self):
         """
@@ -55,20 +97,15 @@ class DBFetchTests(unittest.TestCase):
             ("AAPL", "1min", "XNGS", True)
         ]
         for symbol, time_interval, mic, is_equity in cases:
-            if time_interval in ['1day']:
-                time_conversion = '%Y-%m-%d'
-            elif time_interval in ['1min']:
-                time_conversion = '%Y-%m-%d %H:%M:%S'
+            _, __, time_conversion = self.form_test_essentials(symbol, time_interval, mic, is_equity)
             inserted_data = self.prepare_table_for_case(
-                symbol=symbol, time_interval=time_interval,
-                mic=mic, is_equity=is_equity
-            )
+                symbol=symbol, time_interval=time_interval, mic=mic, is_equity=is_equity)
             date_check = datetime.strptime(inserted_data[0]['datetime'], time_conversion)
-            point = db_functions.fetch_datapoint_by_date(symbol, time_interval, date_check, is_equity, mic_code=mic)
-            self.assertTrue(point)
+            point = db_functions.fetch_datapoint_by_date(date_check, symbol, time_interval, is_equity, mic_code=mic)
+            self.assertCandleMatchesData(point, inserted_data[0], time_conversion, is_equity)
             incorrect_date = date_check - timedelta(days=randint(1, 45))
             with self.assertRaises(helpers.DataNotPresentError_):
-                db_functions.fetch_datapoint_by_date(symbol, time_interval, incorrect_date, is_equity, mic_code=mic)
+                db_functions.fetch_datapoint_by_date(incorrect_date, symbol, time_interval, is_equity, mic_code=mic)
 
     def test_locate_closest_datapoint(self):
         """test row locator function that is part of database data fetching functionality"""
@@ -79,12 +116,7 @@ class DBFetchTests(unittest.TestCase):
             ("AAPL", "1min", "XNGS", True)
         ]
         for symbol, time_interval, mic, is_equity in cases:
-            schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
-            table_name = f"{symbol}_{mic}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
-            if time_interval in ['1day']:
-                time_conversion = '%Y-%m-%d'
-            elif time_interval in ['1min']:
-                time_conversion = '%Y-%m-%d %H:%M:%S'
+            schema_name, table_name, time_conversion = self.form_test_essentials(symbol, time_interval, mic, is_equity)
             random_existing_point = randint(5, 15)
             random_existing_point2 = randint(25, 32)
             inserted_data = self.prepare_table_for_case(
@@ -152,6 +184,15 @@ class DBFetchTests(unittest.TestCase):
         test whether the amount (length of data to be fetched)
         and ID's of edges of the range that is about to be queried is ok
         """
+        # schema not time series:
+        with self.assertRaises(LookupError):
+            db_functions.calculate_fetch_time_bracket(
+                'bla', 'bla', datetime(year=2021, day=1, month=11), datetime(year=2021, day=1, month=11), None, None)
+        # there is no time series like that
+        with self.assertRaises(db_functions.TimeSeriesNotFoundError):
+            db_functions.calculate_fetch_time_bracket(
+                'bla_time_series', 'bla', datetime(year=2021, day=1, month=11),
+                datetime(year=2021, day=1, month=11), None, None)
         # too little inputs cases:
         missing_input_cases = [
             (None, None, None, None),
@@ -175,8 +216,7 @@ class DBFetchTests(unittest.TestCase):
         ]
         for case in cases:
             symbol, time_interval, mic, is_equity = case
-            schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
-            table_name = f"{symbol}_{mic}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
+            schema_name, table_name, _ = self.form_test_essentials(symbol, time_interval, mic, is_equity)
             inserted_data = self.prepare_table_for_case(
                 symbol=symbol, time_interval=time_interval,
                 mic=mic, is_equity=is_equity, inserted_rows=25
@@ -332,7 +372,8 @@ class DBFetchTests(unittest.TestCase):
             (*[None]*6, [fp[0] for fp in forex_pairs]),
             *[(*[field for field in forex_pairs[index][1:]], [index]) for index in range(len(forex_pairs))]
         ]
-        cases.extend([([None if j != i else '' for j in range(6)] + [ValueError]) for i in range(len(forex_pairs[0])-1)])
+        cases.extend([([None if j != i else '' for j in range(6)] + [ValueError])  # noqa
+                      for i in range(len(forex_pairs[0])-1)])
         for case in cases:
             self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_forex_pairs, case[-1], forex_pairs)
 
@@ -381,7 +422,8 @@ class DBFetchTests(unittest.TestCase):
             (*[None]*5, [fp[0] for fp in markets]),
             *[(*[field for field in markets[index][1:]], [index]) for index in range(len(markets))]
         ]
-        cases.extend([([None if j != i else '' for j in range(5)] + [ValueError]) for i in range(len(markets[0])-1)])
+        cases.extend([([None if j != i else '' for j in range(5)] + [ValueError])  # noqa
+                      for i in range(len(markets[0])-1)])
         for case in cases:
             print(case)
             self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_markets, case[-1], markets)
@@ -477,11 +519,11 @@ class DBFetchTests(unittest.TestCase):
             (*[None]*7, [s[0] for s in stocks]),
             *[(*[field for field in stocks[index][1:]], [index]) for index in range(len(stocks))]
         ]
-        cases.extend([([None if j != i else '' for j in range(7)] + [ValueError]) for i in range(len(stocks[0])-1)])
+        cases.extend([([None if j != i else '' for j in range(7)] + [ValueError])  # noqa
+                      for i in range(len(stocks[0])-1)])
         for case in cases:
             self.assertFetchCaseCompliant(case[:-1], db_functions.fetch_stocks, case[-1], stocks)
 
-    # TODO - tests for time series fetching functions here
     def test_fetch_datapoint_by_date(self):
         """
         test fetching a single point of time from database by date
@@ -502,10 +544,7 @@ class DBFetchTests(unittest.TestCase):
             ("AAPL", "1min", "XNGS", True)
         ]
         for symbol_, time_interval, mic, is_equity in cases:
-            if time_interval in ['1day']:
-                time_conversion = '%Y-%m-%d'
-            elif time_interval in ['1min']:
-                time_conversion = '%Y-%m-%d %H:%M:%S'
+            _, __, time_conversion = self.form_test_essentials(symbol_, time_interval, is_equity, mic)
             time_series = self.prepare_table_for_case(symbol_, time_interval, is_equity, mic, inserted_rows=25)
             start = time_series[0]
             end = time_series[-1]
@@ -517,13 +556,7 @@ class DBFetchTests(unittest.TestCase):
             middle_fetch = db_functions.fetch_datapoint_by_date(
                 middle["datetime_object"], symbol_, time_interval, is_equity, mic)
             for pair in [(start, start_fetch), (end, end_fetch), (middle, middle_fetch)]:
-                self.assertEqual(datetime.strptime(pair[0]['datetime'], time_conversion), pair[1][1])
-                self.assertEqual(pair[0]['open'], pair[1][2])
-                self.assertEqual(pair[0]['close'], pair[1][3])
-                self.assertEqual(pair[0]['high'], pair[1][4])
-                self.assertEqual(pair[0]['low'], pair[1][5])
-                if is_equity:
-                    self.assertEqual(pair[0]['volume'], pair[1][6])
+                self.assertCandleMatchesData(pair[1], pair[0], time_conversion, is_equity)
 
     def test_fetch_datapoint_raw_by_pk(self):
         cases = [
@@ -533,15 +566,12 @@ class DBFetchTests(unittest.TestCase):
             ("AAPL", "1min", "XNGS", True)
         ]
         for symbol_, time_interval, mic, is_equity in cases:
-            schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
-            table_name = f"{symbol_}_{mic}" if is_equity else "%s_%s_%s" % (*symbol_.split("/"), time_interval)
-            if time_interval in ['1day']:
-                time_conversion = '%Y-%m-%d'
-            elif time_interval in ['1min']:
-                time_conversion = '%Y-%m-%d %H:%M:%S'
+            schema_name, table_name, time_conversion = self.form_test_essentials(
+                symbol_, time_interval, mic, is_equity)
             random_table_length = randint(25, 75)
             random_point = randint(1, random_table_length-3)
-            time_series = self.prepare_table_for_case(symbol_, time_interval, is_equity, mic, inserted_rows=random_table_length)
+            time_series = self.prepare_table_for_case(
+                symbol_, time_interval, is_equity, mic, inserted_rows=random_table_length)
             start = time_series[0]
             end = time_series[-1]
             middle = time_series[random_point]
@@ -557,22 +587,94 @@ class DBFetchTests(unittest.TestCase):
                 (random_point, middle, middle_fetch)
             ]
             for sub_case in subcases:
-                self.assertEqual(sub_case[0],
-                                 sub_case[2][0])  # "ID" equivalence
-                self.assertEqual(datetime.strptime(sub_case[1]['datetime'], time_conversion), sub_case[2][1])
-                self.assertEqual(sub_case[1]['open'], sub_case[2][2])
-                self.assertEqual(sub_case[1]['close'], sub_case[2][3])
-                self.assertEqual(sub_case[1]['high'], sub_case[2][4])
-                self.assertEqual(sub_case[1]['low'], sub_case[2][5])
-                if is_equity:
-                    self.assertEqual(sub_case[1]['volume'], sub_case[2][6])
+                self.assertEqual(sub_case[0], sub_case[2][0])  # "ID" equivalence
+                self.assertCandleMatchesData(
+                    fetched_candle=sub_case[2], data_candle=sub_case[1],
+                    time_string_conversion=time_conversion, is_equity=is_equity
+                )
+
+    # TODO - tests for time series fetching functions here
+    def test_fetch_data_by_IDs(self):
+        with self.assertRaises(UndefinedTable):
+            db_functions.fetch_data_raw_by_pks('publi', ''.join(choices('awgv', k=7)))
+
+        public_tables = [
+            ("public", "countries"),
+            ("public", "markets"),
+            ("public", "stocks"),
+            ("public", "plans"),
+            ("public", "forex_pairs"),
+        ]
+
+        # test for some public tables
+        for t in public_tables:
+            last_id_possible = db_functions.last_row_ID(*t)
+            sub_cases = [
+                (None, None),
+                (0, last_id_possible),
+                (randint(-46943, -24), last_id_possible + randint(20, 49237)),
+                (None, last_id_possible + randint(20, 49237)),
+                (randint(-46943, -24), None),
+            ]
+            # some default as well as edge cases
+            for sub_case in sub_cases:
+                self.assertDatabaseAssumedRowsNumber(
+                    *t, data_length=len(db_functions.fetch_data_raw_by_pks(*t, *sub_case)))
+            # since the check inside is ">=" and "<=" -> a single row of exactly the same id
+            # should be possible to obtain when start and end are equal
+            self.assertEqual(1, len(db_functions.fetch_data_raw_by_pks(*t, start_id=0, end_id=0)))
+            random_row = randint(1, last_id_possible)
+            self.assertEqual(1, len(db_functions.fetch_data_raw_by_pks(*t, start_id=random_row, end_id=random_row)))
+            # middle of the data
+            st_row = randint(0, last_id_possible - 1)
+            e_row = randint(st_row, last_id_possible)
+            self.assertEqual(
+                e_row - st_row + 1, len(db_functions.fetch_data_raw_by_pks(*t, start_id=st_row, end_id=e_row)))
+
+        time_table_cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
+
+        # cases for artificial timetables
+        for case in time_table_cases:
+            symbol_, time_interval, mic, is_equity = case
+            schema_name, table_name, time_conversion = self.form_test_essentials(
+                symbol_, time_interval, mic, is_equity)
+            random_table_length = randint(25, 70)
+            _time_series = self.prepare_table_for_case(
+                symbol_, time_interval, is_equity, mic, inserted_rows=random_table_length)
+            t = schema_name, table_name
+            last_id_possible = db_functions.last_row_ID(*t)
+            sub_cases = [
+                (None, None),
+                (0, last_id_possible),
+                (randint(-46943, -24), last_id_possible + randint(20, 49237)),
+                (None, last_id_possible + randint(20, 49237)),
+                (randint(-46943, -24), None),
+            ]
+            # some default as well as edge cases
+            for sub_case in sub_cases:
+                self.assertDatabaseAssumedRowsNumber(
+                    *t, data_length=len(db_functions.fetch_data_raw_by_pks(*t, *sub_case)))
+            # since the check inside is ">=" and "<=" -> a single row of exactly the same id
+            # should be possible to obtain when start and end are equal
+            self.assertEqual(1, len(db_functions.fetch_data_raw_by_pks(*t, start_id=0, end_id=0)))
+            random_row = randint(1, last_id_possible)
+            self.assertEqual(1, len(db_functions.fetch_data_raw_by_pks(*t, start_id=random_row, end_id=random_row)))
+            # middle of the data
+            st_row = randint(0, last_id_possible - 1)
+            e_row = randint(st_row, last_id_possible)
+            fetched_timeseries = db_functions.fetch_data_raw_by_pks(*t, start_id=st_row, end_id=e_row)
+            self.assertEqual(e_row - st_row + 1, len(fetched_timeseries))
+            data_to_check = _time_series[st_row:e_row] + [_time_series[e_row]]
+            for fetched_point, data_point in zip(fetched_timeseries, data_to_check):
+                self.assertCandleMatchesData(fetched_point, data_point, time_conversion, is_equity)
 
     @unittest.skip("this is a test stub")
-    def test_fetch_data_from_IDs(self):
-        pass
-
-    @unittest.skip("this is a test stub")
-    def test_fetch_data_from_timestamps(self):
+    def test_fetch_data_by_timestamps(self):
         pass
 
 

@@ -1,5 +1,4 @@
 from ast import literal_eval
-from pprint import pprint
 
 import psycopg2
 from db_functions.db_helpers import _connection_dict, db_string_converter_

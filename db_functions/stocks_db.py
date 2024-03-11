@@ -125,4 +125,3 @@ def fetch_stocks_(
         ))
         f_ps = cur.fetchall()
     return f_ps
-

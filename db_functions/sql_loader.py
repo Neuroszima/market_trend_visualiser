@@ -32,4 +32,3 @@ def purge_db_structure_():
 if __name__ == '__main__':
     purge_db_structure_()
     import_db_structure_()
-

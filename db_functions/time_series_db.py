@@ -1,8 +1,8 @@
-from ast import literal_eval
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Literal
 
 import psycopg2
+from psycopg2.errors import UndefinedTable
 
 from db_functions.db_helpers import (
     _connection_dict,
@@ -106,10 +106,6 @@ _query_get_point_by_ID = "SELECT * FROM \"{schema_name}\".\"{table_name}\" serie
 _query_get_data_by_timestamps = """
 SELECT * FROM \"{schema_name}\".\"{table_name}\" series 
 WHERE series.datetime {earlier_bracket} {optional_and} {later_bracket} {optional_limit};
-"""
-_query_get_data_by_IDs = """
-SELECT * FROM \"{schema_name}\".\"{table_name}\" series 
-WHERE series."ID" {earlier_bracket} AND {later_bracket} {optional_limit};
 """
 
 
@@ -344,6 +340,9 @@ def calculate_fetch_time_bracket_(
     """
     # raise NotImplementedError("this function is not yet ready and is a stub")
     # decide if it is possible to form a bracket
+    if "time_series" not in schema_name:
+        raise LookupError('only data from "time_series" related schemas, containing time '
+                          'sequences, can be fetched using this function')
     missing_count = [
         not start_date, not end_date,
         (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
@@ -366,12 +365,15 @@ def calculate_fetch_time_bracket_(
         start_date = end_date - time_span
 
     earliest_id, latest_id = None, None
-    # find ID of the item that is associated with the earliest possible datapoint closest to start_date
-    if start_date:
-        earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation=">=")
-    # find ID of the item that is associated with the latest possible datapoint closest to end_date
-    if end_date:
-        latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation="<=")
+    try:
+        # find ID of the item that is associated with the earliest possible datapoint closest to start_date
+        if start_date:
+            earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation=">=")
+        # find ID of the item that is associated with the latest possible datapoint closest to end_date
+        if end_date:
+            latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation="<=")
+    except UndefinedTable:
+        raise TimeSeriesNotFoundError_(f'series: {schema_name}.{table_name} does not exist')
 
     if (latest_id is None) and (trading_time_span is not None) and (earliest_id is not None):
         latest_id = earliest_id + trading_time_span - 1
@@ -387,12 +389,19 @@ def calculate_fetch_time_bracket_(
     return earliest_id, latest_id
 
 
-def fetch_data_(schema_name: str, table_name: str,
-        start_date: datetime | None = None, end_date: datetime | None = None,
-        time_span: timedelta | None = None, trading_time_span: int | None = None):
-    """get data from database based on timestamps, or additional information"""
+def fetch_data_by_dates_(schema_name: str, table_name: str,
+                         start_date: datetime | None = None, end_date: datetime | None = None,
+                         time_span: timedelta | None = None, trading_time_span: int | None = None):
+    """
+    Get data from database based on timestamps, or additional information
+    Since this method only uses dates and its derivatives as an input, it is limited to query schemas containing
+    time series information
+    """
     raise NotImplementedError('function not tested, thus not ready to use')
     # decide if it is possible to form a bracket
+    if "time_series" not in schema_name:
+        raise LookupError('only data from "time_series" related schemas, containing time '
+                          'sequences, can be fetched using this function')
     missing_count = [
         not start_date, not end_date,
         (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
@@ -436,13 +445,17 @@ def fetch_data_(schema_name: str, table_name: str,
         }
     else:
         d = (schema_name, table_name, start_date, end_date, time_span, trading_time_span)
-        raise RuntimeError(f'something went wrong: {d}')
+        raise RuntimeError(
+            f'something went wrong, couldn\'t formulate a bracket even when data has been passed to function: {d}')
 
     q["schema_name"] = schema_name
     q["table_name"] = table_name
     q["optional_limit"] = optional_limit
-    with psycopg2.connect(**_connection_dict) as conn:
-        cur = conn.cursor()
-        cur.execute(_query_get_data_by_timestamps.format(**q))
-        data = cur.fetchall()
+    try:
+        with psycopg2.connect(**_connection_dict) as conn:
+            cur = conn.cursor()
+            cur.execute(_query_get_data_by_timestamps.format(**q))
+            data = cur.fetchall()
+    except UndefinedTable:
+        raise TimeSeriesNotFoundError_(f'series: {schema_name}.{table_name} does not exist')
     return data

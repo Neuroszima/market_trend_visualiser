@@ -134,7 +134,7 @@ class ProcedureTests(unittest.TestCase):
                 (function_name, schema, 'FUNCTION'), function_list,
                 msg=f"function not found {function_name}"
             )
-        views_list = helpers.list_nonstandard_views()
+        views_list = helpers.list_nonstandard_views_()
         for view in views_in_database:
             self.assertIn(view, views_list, msg=f"view not found {view[1]}")
 
