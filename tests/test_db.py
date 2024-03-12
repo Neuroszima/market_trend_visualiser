@@ -15,6 +15,12 @@ class DBTests(unittest.TestCase):
     def setUp(self) -> None:
         db_functions.purge_db_structure()
         db_functions.import_db_structure()
+        self.time_series_table_cases = [
+            ("AAPL", "1day", "XNGS", True),
+            ("USD/EUR", "1day", None, False),
+            ("USD/EUR", "1min", None, False),
+            ("AAPL", "1min", "XNGS", True)
+        ]
 
     def assertDatabaseHasRows(self, schema_name, table_name, correct_num_of_rows):
         with psycopg2.connect(**helpers._connection_dict) as conn:
@@ -175,7 +181,6 @@ class DBTests(unittest.TestCase):
 
         for e in sample_data:
             equity_types.update((str(e['type']),))
-
         try:
             db_functions.insert_investment_types(equity_types)
             db_functions.insert_stocks(sample_data)
@@ -232,8 +237,8 @@ class DBTests(unittest.TestCase):
 
     def test_is_stock(self):
         """look at stock checking functionality (database function)"""
-        err_msg1 = "stock not recognized after insertion attempt - %s"
-        err_msg2 = "stock falsely recognized - %s"
+        err_msg1 = "stock symbol not recognized after insertion attempt - %s"
+        err_msg2 = "stock symbol falsely recognized - %s"
         stocks = [
             ("NVDA", True),
             ("OTEX", True),
@@ -245,15 +250,39 @@ class DBTests(unittest.TestCase):
         ]
         self.save_samples_for_tests()
 
-        for stock, in_database in stocks:
+        for stock_symbol, in_database in stocks:
             if in_database:
-                self.assertTrue(db_functions.is_stock(stock), msg=err_msg1 % stock)
+                self.assertTrue(db_functions.is_equity(stock_symbol), msg=err_msg1 % stock_symbol)
             else:
-                self.assertFalse(db_functions.is_stock(stock), msg=err_msg2 % stock)
+                self.assertFalse(db_functions.is_equity(stock_symbol), msg=err_msg2 % stock_symbol)
+
+    def test_is_forex_pair(self):
+        """look at forex pair checking functionality (database function)"""
+        err_msg1 = "forex symbol not recognized after insertion attempt - %s"
+        err_msg2 = "forex symbol falsely recognized - %s"
+        stocks = [
+            ("NVDA", False),
+            ("OTEX", False),
+            ("AAPL", False),
+            ("XXXXXXXX", False),
+            ("AADV", False),
+            ("".join(choices("AWNGORESDZ", k=21)), False),
+            ("USD/CAD", False),  # this one is false because it should not exist in db as a test sample member
+            ('KGS/RUB', True),
+            ('USD/EUR', True)
+        ]
+        self.save_samples_for_tests()
+
+        for symbol, in_database in stocks:
+            if in_database:
+                self.assertTrue(db_functions.is_forex_pair(symbol), msg=err_msg1 % symbol)
+            else:
+                self.assertFalse(db_functions.is_forex_pair(symbol), msg=err_msg2 % symbol)
 
     def test_obtain_latest_timestamp_from_db(self):
         """obtain latest timestamp from certain timetable, for table update purpose"""
         # first - stock market timestamp
+        self.save_samples_for_tests()
         stock_, market_identification_code_ = "OTEX", "XNGS"
         interval_ = "1min"
 
@@ -289,7 +318,10 @@ class DBTests(unittest.TestCase):
                 time_interval=interval_,
                 symbol=symbol,
             ))
-        db_functions.create_time_series(symbol=symbol, time_interval=interval_, is_equity=False)
+        with self.assertRaises(db_functions.DataUncertainError):  # USD/CAD not in database as forex pair
+            db_functions.create_time_series(symbol=symbol, time_interval=interval_)
+        symbol = 'USD/EUR'
+        db_functions.create_time_series(symbol=symbol, time_interval=interval_)
 
         historical_dummy_data = [
             {
@@ -297,15 +329,15 @@ class DBTests(unittest.TestCase):
             },
         ]
         db_functions.insert_historical_data(
-            historical_dummy_data, symbol=symbol, time_interval=interval_, is_equity=False)
+            historical_dummy_data, symbol=symbol, time_interval=interval_)
         with self.assertRaises(ValueError):  # market identifier HAS TO be ignored when querying for currency pair
             db_functions.time_series_latest_timestamp(
-                symbol=symbol, time_interval=interval_, mic_code=market_identification_code_, is_equity=False)
-        self.assertIsNotNone(db_functions.time_series_latest_timestamp(
-            symbol, interval_, is_equity=False))
+                symbol=symbol, time_interval=interval_, mic_code=market_identification_code_)
+        self.assertIsNotNone(db_functions.time_series_latest_timestamp(symbol, interval_))
 
     def test_equity_time_series_data_insertion(self):
         """test if properly formatted dummy data will be saved into database"""
+        self.save_samples_for_tests()
         stock_, market_identification_code_ = "OTEX", "XNGS"
         intervals = ["1min", "1day"]
 
@@ -334,17 +366,18 @@ class DBTests(unittest.TestCase):
             assert db_functions.time_series_table_exists(stock_, interval_, mic_code=market_identification_code_)
             self.assertDatabaseHasRows(schema_name, table_name, len(total_dummy_data))
             # index should go from 0
-            self.assertEqual(helpers.last_row_ID_(
+            self.assertEqual(helpers.fetch_generic_last_ID_(
                 schema_name, f"{stock_}_{market_identification_code_}"), len(total_dummy_data) - 1)
 
     def test_forex_time_series_data_insertion(self):
         """test if properly formatted dummy data will be saved into database"""
-        symbol = "USD/CAD"
+        self.save_forex_sample()
+        symbol = "USD/GBP"
         schema_name = "forex_time_series"
         intervals = ["1min", "1day"]
 
         for interval_ in intervals:
-            db_functions.create_time_series(symbol=symbol, time_interval=interval_, is_equity=False)
+            db_functions.create_time_series(symbol=symbol, time_interval=interval_)
             self.assertTableExist(
                 table_name="_".join(symbol.split("/")).upper() + f"_{interval_}",
                 schema_name=schema_name,
@@ -362,31 +395,53 @@ class DBTests(unittest.TestCase):
             )
             table_ = "_".join(symbol.split("/")).upper() + f"_{interval_}"
             self.assertDatabaseHasRows("forex_time_series", table_, len(total_dummy_data))
-            assert db_functions.time_series_table_exists(symbol, interval_, is_equity=False)
-            self.assertEqual(helpers.last_row_ID_(
+            # following 'exists' function now rely on an internal db symbol search, opposed to us giving it is_stock
+            assert db_functions.time_series_table_exists(symbol, interval_)
+            self.assertEqual(helpers.fetch_generic_last_ID_(
                 schema_name, table_name=table_), len(total_dummy_data) - 1)
 
     def test_create_financial_view(self):
         """test setting up financial views for different types of time series, as well as different timeframes"""
         # prepare the database with dummy data
         self.save_samples_for_tests()
-        cases = [
-            ("AAPL", "1day", "XNGS", True),
-            ("USD/EUR", "1day", None, False),
-            ("USD/EUR", "1min", None, False),
-            ("AAPL", "1min", "XNGS", True)
-        ]
-        for symbol, time_interval, mic, is_equity in cases:
+        for symbol, time_interval, mic, is_equity in self.time_series_table_cases:
             schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
             table_name = f"{symbol}_{mic}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
 
             # no table yet - error
             with self.assertRaises(db_functions.TimeSeriesNotFoundError):
-                db_functions.create_financial_view(symbol, time_interval, is_equity, mic_code=mic)
+                db_functions.create_time_series_view(symbol, time_interval, mic_code=mic)
 
-            db_functions.create_time_series(symbol, time_interval, is_equity, mic_code=mic)
-            db_functions.create_financial_view(symbol, time_interval, is_equity, mic_code=mic)
+            db_functions.create_time_series(symbol, time_interval, mic_code=mic)
+            db_functions.create_time_series_view(symbol, time_interval, mic_code=mic)
             self.assertViewExists(view_name=f"{table_name}_view", schema_name=schema_name)
+
+    def test_resolve_schema_table_names(self):
+        """
+        test if the function that resolves schema_name and table_name works, based on the data that is present in db
+        """
+        self.save_samples_for_tests()
+        error_cases = [
+            (None, None, None, None),
+            ("bla", "OAIWJDOn", "awdo", 'hrn'),
+            ("AAAA", "1min", None, False),
+            ("AAPL", "1h", "XNGS", False),
+            ("USD/EUR", "1h", None, None),
+        ]
+        for case in error_cases:
+            symbol, time_interval, mic_code, is_equity_prediction = case
+            with self.assertRaises((db_functions.DataUncertainError, ValueError)):
+                db_functions.resolve_time_series_location(symbol, time_interval, mic_code)
+
+        for case in self.time_series_table_cases:
+            symbol, time_interval, mic_code, is_equity_prediction = case
+            schema_name_prediction, table_name_prediction, _ = t_helpers.form_test_essentials(
+                symbol, time_interval, mic_code, is_equity_prediction)
+            schema_name, table_name, is_equity = db_functions.resolve_time_series_location(
+                symbol, time_interval, mic_code=mic_code)
+            self.assertEqual(is_equity, is_equity_prediction, msg=f"{is_equity}")
+            self.assertEqual(schema_name, schema_name_prediction, msg=f"{schema_name}")
+            self.assertEqual(table_name, table_name_prediction, msg=f"{table_name}")
 
 
 if __name__ == '__main__':

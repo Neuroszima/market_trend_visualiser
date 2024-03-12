@@ -139,6 +139,24 @@ def pop_row_from_database(day_to_pop_index, schema_name, table_name):
         ))
 
 
+def form_test_essentials(symbol_: str, time_interval: str, mic: str, is_equity: bool) -> tuple:
+    """
+    prepare schema_name, table_name, time_conversion strings that are consumed in tests frequently
+    based on common test starting conditions
+
+    :return: schema_name, table_name, time_conversion
+    """
+    schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
+    table_name = f"{symbol_}_{mic}" if is_equity else "%s_%s_%s" % (*symbol_.split("/"), time_interval)  # noqa
+    if time_interval in ['1day']:
+        time_conversion = '%Y-%m-%d'
+    elif time_interval in ['1min']:
+        time_conversion = '%Y-%m-%d %H:%M:%S'
+    else:
+        raise ValueError(time_interval)
+    return schema_name, table_name, time_conversion
+
+
 if __name__ == '__main__':
     sample = generate_random_time_sample('1day', True, 45)
     print([(day['datetime'], day['datetime_object'].isoweekday()) for day in sample])

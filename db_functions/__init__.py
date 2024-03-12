@@ -32,17 +32,17 @@ fetch_investment_types: Callable = stocks_db.fetch_investment_types_
 fetch_stocks: Callable = stocks_db.fetch_stocks_
 
 create_time_series: Callable = time_series_db.create_time_series_
-time_series_latest_timestamp: Callable[[str, str, bool, str | None], datetime] = \
+time_series_latest_timestamp: Callable[[str, str, str | None], datetime] = \
     time_series_db.time_series_latest_timestamp_
 time_series_table_exists: Callable = time_series_db.time_series_table_exists_
 insert_historical_data: Callable = time_series_db.insert_historical_data_
 fetch_datapoint_by_date: Callable = time_series_db.fetch_datapoint_by_date_
-fetch_datapoint_raw_by_pk: Callable = time_series_db.fetch_datapoint_raw_by_pk_
-locate_closest_datapoint: Callable = time_series_db.locate_closest_datapoint_
+fetch_ID_closest_to_date_: Callable = time_series_db.fetch_ID_closest_to_date_
 calculate_fetch_time_bracket: Callable = time_series_db.calculate_fetch_time_bracket_
 fetch_data_by_dates: Callable = time_series_db.fetch_data_by_dates_
+resolve_time_series_location: Callable = time_series_db.resolve_time_series_location_
 
-create_financial_view: Callable[[str, str, bool, str | None], None] = db_views.create_financial_view_
+create_time_series_view: Callable[[str, str, str | None], None] = db_views.create_time_series_view_
 list_nonstandard_views: Callable[[], tuple] = db_views.list_nonstandard_views_
 view_exists: Callable[[str], bool] = db_views.view_exists_
 
@@ -51,9 +51,11 @@ import_db_structure: Callable = sql_loader.import_db_structure_
 
 db_string_converter: Callable[[str], str] = db_helpers.db_string_converter_
 list_nonstandard_functions: Callable = db_helpers.list_nonstandard_functions_
-last_row_ID: Callable[[str, str], str] = db_helpers.last_row_ID_
-fetch_data_raw_by_pks: Callable[[str, str], list] = db_helpers.fetch_data_raw_by_pks_
-is_stock: Callable[[str], bool] = db_helpers.is_stock_
+fetch_generic_by_ID_: Callable[[int, str, str], tuple] = db_helpers.fetch_generic_by_ID_
+fetch_generic_last_ID: Callable[[str, str], int] = db_helpers.fetch_generic_last_ID_
+fetch_generic_range_by_IDs: Callable[[str, str], list] = db_helpers.fetch_generic_range_by_IDs_
+is_equity: Callable[[str], bool] = db_helpers.is_equity_
+is_forex_pair: Callable[[str], bool] = db_helpers.is_forex_pair_
 TimeSeriesNotFoundError: type[Exception] = db_helpers.TimeSeriesNotFoundError_
 TimeSeriesExistsError: type[Exception] = db_helpers.TimeSeriesExistsError_
 DataNotPresentError: type[Exception] = db_helpers.DataNotPresentError_
