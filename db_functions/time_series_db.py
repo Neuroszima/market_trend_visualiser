@@ -5,6 +5,7 @@ import psycopg2
 from psycopg2.errors import UndefinedTable
 
 from db_functions.db_helpers import (
+    is_equity_, is_forex_pair_,
     _connection_dict,
     _information_schema_table_check,
     db_string_converter_,
@@ -76,12 +77,8 @@ VALUES (
 """  # the ":: timestamp.." is comment in PSQL, so it's ok
 
 # select queries
-_last_equity_timetable_point = """
-SELECT series.datetime FROM "{time_interval}_time_series"."{symbol}_{market_identification_code}" series 
-ORDER BY series."ID" DESC LIMIT 1
-"""
-_last_forex_timetable_point = """
-SELECT series.datetime FROM "forex_time_series"."{symbol}_{time_interval}" series 
+_last_timetable_point = """
+SELECT series.datetime FROM "{time_series_schema}"."{time_series_table}" series 
 ORDER BY series."ID" DESC LIMIT 1
 """
 
@@ -91,18 +88,14 @@ SELECT * FROM "{time_interval}_time_series"."{symbol}_{market_identification_cod
 _query_get_data_from_forex_timeseries = """
 SELECT * FROM "forex_time_series"."{symbol}_{time_interval}";
 """
-_query_get_single_forex_timeseries_point = """
-SELECT * FROM "forex_time_series"."{symbol}_{time_interval}" series where series.datetime = '{search_date}';
-"""
-_query_get_single_equity_timeseries_point = """
-SELECT * FROM "{time_interval}_time_series"."{symbol}_{market_identification_code}" series
+_query_get_single_timeseries_point = """
+SELECT * FROM "{time_series_schema}"."{time_series_table}" series 
 where series.datetime = '{search_date}';
 """
 _query_get_ID_from_table_by_date = """
 SELECT "ID" FROM "{schema_name}"."{table_name}" series
 where series.datetime {operation} TIMESTAMP '{search_date}' ORDER BY series.datetime {operation_order} LIMIT 1;
 """
-_query_get_point_by_ID = "SELECT * FROM \"{schema_name}\".\"{table_name}\" series WHERE series.\"ID\" = {id_}"
 _query_get_data_by_timestamps = """
 SELECT * FROM \"{schema_name}\".\"{table_name}\" series 
 WHERE series.datetime {earlier_bracket} {optional_and} {later_bracket} {optional_limit};
@@ -110,17 +103,47 @@ WHERE series.datetime {earlier_bracket} {optional_and} {later_bracket} {optional
 
 
 @time_interval_sanitizer()
+def resolve_time_series_location_(
+    symbol: str, time_interval: str, is_equity: bool | None = None,
+        mic_code: str | None = None) -> tuple[str, str, bool]:
+    """check if data provided actually points to a table existing in database or not"""
+    if not isinstance(is_equity, bool):
+        is_equity = is_equity_(symbol)
+        is_forex_pair = is_forex_pair_(symbol)
+    else:
+        is_forex_pair = not is_equity
+
+    if is_equity:
+        if mic_code is None:
+            raise ValueError('market identifier code should be passed along the ticker')
+        schema_name = f"{time_interval}_time_series"
+        table_name = f"{symbol}_{mic_code}"
+        is_equity = True
+    elif is_forex_pair:
+        if mic_code is not None:
+            raise ValueError('market identifier should be skipped when passing symbol that resolves to forex pair')
+        schema_name = "forex_time_series"
+        base, quote = symbol.split("/")
+        table_name = f"{base}_{quote}_{time_interval}"
+        is_equity = False
+    else:
+        raise DataUncertainError_("with current information, couldn't find the data "
+                                  f"resembling anything that is in the database: {symbol}")
+    return schema_name, table_name, is_equity
+
+
 def insert_historical_data_(
         historical_data: list[dict], symbol: str, time_interval: str,
-        rownum_start: int = 0, is_equity=True, mic_code: str | None = None
-):
+        rownum_start: int = 0, is_equity: bool | None = None, mic_code: str | None = None):
     """
     Insert historical data for given equity into the database. Earliest timestamped rows are inserted first
     rownum_start is used, when table already has some data, and user wants to append fresh changes to time series
+    for this function, the 'is_equity' has been left alone with 'True/False' to make it easier to
 
     :param is_equity: differentiates from forex pairs and equity (stock/bond/etc.) time series
     :param mic_code: if inserting equity data, use it to denote exchange from which it comes
     """
+    _, __, is_equity = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
 
     if time_interval in ['1day']:  # future-thinking about other time intervals allowed by provider...
         timestring = '%Y-%m-%d'
@@ -158,26 +181,20 @@ def insert_historical_data_(
                 query_dict['symbol'] = "_".join(symbol.split("/")).upper()
                 query_dict['time_interval'] = time_interval
                 cur.execute(_query_insert_forex_data.format(**query_dict))
-            # conn.commit()
+        conn.commit()
         cur.close()
 
 
-@time_interval_sanitizer()
-def time_series_table_exists_(symbol: str, time_interval: str, is_equity=True, mic_code: str | None = None) -> bool:
+def time_series_table_exists_(
+        symbol: str, time_interval: str, is_equity: bool | None = None, mic_code: str | None = None) -> bool:
     """
     check if the given table exists in the time-specific schema
     """
+    time_series_schema, table_name, _ = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        if is_equity:
-            table_name = db_string_converter_(f"{symbol}_{mic_code}")
-            time_series_schema = f'{time_interval}_time_series'
-        else:
-            symbol_ = "_".join(symbol.split("/")).upper()  # fixing some small characters like in "GBp"
-            table_name = db_string_converter_(f"{symbol_}_{time_interval}")
-            time_series_schema = "forex_time_series"
         cur.execute(_information_schema_table_check.format(
-            table_name=table_name,
+            table_name=db_string_converter_(table_name),
             schema=db_string_converter_(time_series_schema),
         ))
         result = cur.fetchall()
@@ -186,14 +203,16 @@ def time_series_table_exists_(symbol: str, time_interval: str, is_equity=True, m
         return False
 
 
-@time_interval_sanitizer()
-def create_time_series_(symbol: str, time_interval: str, is_equity=True, mic_code: str | None = None) -> None:
+def create_time_series_(
+        symbol: str, time_interval: str, is_equity: bool | None = None, mic_code: str | None = None) -> None:
     """
     creates table inside database schema, that corresponds to time_interval passed into function call
 
     each time interval has corresponding database schema that saves stock market price history
     for the given symbol/MIC pair
     """
+    # retrieve schema and table names
+    schema_name, table_name, is_equity = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         if is_equity:
@@ -215,30 +234,22 @@ def create_time_series_(symbol: str, time_interval: str, is_equity=True, mic_cod
     assert time_series_table_exists_(symbol, time_interval, is_equity=is_equity, mic_code=mic_code)
 
 
-@time_interval_sanitizer()
 def time_series_latest_timestamp_(
-        symbol: str, time_interval: str, is_equity: bool = True, mic_code: str | None = None) -> datetime | None:
+        symbol: str, time_interval: str, is_equity: bool | None = None, mic_code: str | None = None) -> datetime | None:
     """
     grab the latest datapoint from a timeseries and extract the data from it in the format ready to be
     consumed by API loader
     """
+    # retrieve schema and table names
+    schema_name, table_name, is_equity = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
+
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-
         q_dict = {
-            "time_interval": time_interval,
+            "time_series_schema": schema_name,
+            "time_series_table": table_name,
         }
-        if is_equity:
-            q_dict["symbol"] = symbol
-            if mic_code is None:
-                raise ValueError('There has to be a market identification code passed along the stock/equity symbol')
-            q_dict["market_identification_code"] = mic_code
-            cur.execute(_last_equity_timetable_point.format(**q_dict))
-        else:
-            if mic_code is not None:
-                raise ValueError('If not stock or equity - MIC should be ignored')
-            q_dict["symbol"] = "_".join(symbol.split("/")).upper()
-            cur.execute(_last_forex_timetable_point.format(**q_dict))
+        cur.execute(_last_timetable_point.format(**q_dict))
         last_record = cur.fetchall()
         try:
             t_ = last_record[0][0]  # this will already be a "datetime.datetime()" python object
@@ -247,45 +258,29 @@ def time_series_latest_timestamp_(
     return t_
 
 
-def fetch_datapoint_raw_by_pk_(id_: int, table_name: str, schema_name: str) -> tuple:
-    """
-    the simplest form of fetching data from the table
-    column "ID" serves as the primary key of every time series that comes into existence
-    """
-    with psycopg2.connect(**_connection_dict) as conn:
-        cur = conn.cursor()
-        print(id_, table_name, schema_name)
-        cur.execute(_query_get_point_by_ID.format(
-            schema_name=schema_name, table_name=table_name, id_=id_,
-        ))
-        res = cur.fetchall()
-    print(res)
-    return res[0]
-
-
 def fetch_datapoint_by_date_(
-        date: datetime | str, symbol: str, time_interval: str,  is_equity: bool, mic_code: str | None = None):
+        date: datetime | str, symbol: str, time_interval: str,
+        is_equity: bool | None = None, mic_code: str | None = None):
     """
     Obtain a point from database based on timestamp
     For now we require absolute precision in terms of selecting dates. If you fail to pass a date,
     that already has a point associated with it, this function will raise.
     """
+    # retrieve schema and table names
+    schema_name, table_name, is_equity = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
+
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
-        if is_equity:
-            q = _query_get_single_equity_timeseries_point.format(
-                symbol=symbol, time_interval=time_interval,
-                market_identification_code=mic_code,
-                search_date=str(date)
-            )
-        else:
-            q = _query_get_single_forex_timeseries_point.format(
-                symbol="_".join(symbol.split("/")),
-                time_interval=time_interval,
-                search_date=str(date)
-            )
-        print(q)
-        cur.execute(q)
+        q = _query_get_single_timeseries_point.format(
+            time_series_schema=schema_name,
+            time_series_table=table_name,
+            search_date=date,
+        )
+        try:
+            cur.execute(q)
+        # user forced 'False/True' in 'is_equity' and PSQL didn't finc anything despite efforts
+        except UndefinedTable:
+            raise TimeSeriesNotFoundError_(f'There is no time series: {schema_name}.{table_name}')
         res = cur.fetchall()
     if not res:
         raise DataNotPresentError_(f"There is no point in data that is associated with date: {date}")
@@ -294,12 +289,13 @@ def fetch_datapoint_by_date_(
     return res[0]
 
 
-def locate_closest_datapoint_(
-        date_to_check: datetime, schema_name: str, table_name: str, operation: Literal['<=', '>=']):
+def fetch_ID_closest_to_date_(
+        date_to_check: datetime, operation: Literal['<=', '>='],
+        symbol: str, time_interval: str, is_equity: bool | None = None, mic_code: str | None = None) -> int:
     """search for the closest datapoint to the date given as argument"""
-    # raise NotImplementedError("this function is not yet ready and is a stub")
     if operation not in ['<=', '>=']:
         raise ValueError(f'Operation {operation} is not allowed. allowed operations: "<=", "=>"')
+    schema_name, table_name, _ = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
     with psycopg2.connect(**_connection_dict) as conn:
         cur = conn.cursor()
         q = {
@@ -312,7 +308,6 @@ def locate_closest_datapoint_(
         cur.execute(_query_get_ID_from_table_by_date.format(**q))
         res = cur.fetchall()
     if not res:
-        # print(_query_get_ID_from_table_by_date.format(**q))
         raise DataNotPresentError_(
             f"Couldn't find datapoint closest to {date_to_check} "
             f'parameters: {schema_name=}, {table_name=}, {operation=}'
@@ -321,8 +316,8 @@ def locate_closest_datapoint_(
 
 
 def calculate_fetch_time_bracket_(
-        schema_name: str, table_name: str,
-        # symbol: str, time_interval: str, is_equity: bool, mic_code: str | None = None,
+        # schema_name: str, table_name: str,
+        symbol: str, time_interval: str, is_equity: bool | None = None, mic_code: str | None = None,
         start_date: datetime | None = None, end_date: datetime | None = None,
         time_span: timedelta | None = None, trading_time_span: int | None = None):
     """
@@ -338,11 +333,7 @@ def calculate_fetch_time_bracket_(
     If you provide multiple parameters, start_date and end_date will take precedence over passed time spans
     Please save yourself a minute and don't use this function to actually fetch data XD.
     """
-    # raise NotImplementedError("this function is not yet ready and is a stub")
     # decide if it is possible to form a bracket
-    if "time_series" not in schema_name:
-        raise LookupError('only data from "time_series" related schemas, containing time '
-                          'sequences, can be fetched using this function')
     missing_count = [
         not start_date, not end_date,
         (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
@@ -355,8 +346,7 @@ def calculate_fetch_time_bracket_(
         )
 
     # retrieve schema and table names
-    # schema_name = f"{time_interval}_time_series" if is_equity else "forex_time_series"
-    # table_name = f"{symbol}_{mic_code}" if is_equity else "%s_%s_%s" % (*symbol.split("/"), time_interval)
+    schema_name, table_name, is_equity = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
 
     # calculate start and end of bracket, if datetime/timedelta was passed
     if start_date and time_span and (end_date is None):
@@ -365,15 +355,14 @@ def calculate_fetch_time_bracket_(
         start_date = end_date - time_span
 
     earliest_id, latest_id = None, None
-    try:
-        # find ID of the item that is associated with the earliest possible datapoint closest to start_date
-        if start_date:
-            earliest_id = locate_closest_datapoint_(start_date, schema_name, table_name, operation=">=")
-        # find ID of the item that is associated with the latest possible datapoint closest to end_date
-        if end_date:
-            latest_id = locate_closest_datapoint_(end_date, schema_name, table_name, operation="<=")
-    except UndefinedTable:
-        raise TimeSeriesNotFoundError_(f'series: {schema_name}.{table_name} does not exist')
+    # find ID of the item that is associated with the earliest possible datapoint closest to start_date
+    if start_date:
+        earliest_id = fetch_ID_closest_to_date_(
+            start_date, operation=">=", symbol=symbol, time_interval=time_interval, mic_code=mic_code)
+    # find ID of the item that is associated with the latest possible datapoint closest to end_date
+    if end_date:
+        latest_id = fetch_ID_closest_to_date_(
+            end_date, operation="<=", symbol=symbol, time_interval=time_interval, mic_code=mic_code)
 
     if (latest_id is None) and (trading_time_span is not None) and (earliest_id is not None):
         latest_id = earliest_id + trading_time_span - 1
@@ -389,19 +378,16 @@ def calculate_fetch_time_bracket_(
     return earliest_id, latest_id
 
 
-def fetch_data_by_dates_(schema_name: str, table_name: str,
-                         start_date: datetime | None = None, end_date: datetime | None = None,
-                         time_span: timedelta | None = None, trading_time_span: int | None = None):
+def fetch_data_by_dates_(
+        symbol: str, time_interval: str, is_equity: bool | None = None, mic_code: str | None = None,
+        start_date: datetime | None = None, end_date: datetime | None = None,
+        time_span: timedelta | None = None, trading_time_span: int | None = None):
     """
     Get data from database based on timestamps, or additional information
     Since this method only uses dates and its derivatives as an input, it is limited to query schemas containing
     time series information
     """
-    raise NotImplementedError('function not tested, thus not ready to use')
     # decide if it is possible to form a bracket
-    if "time_series" not in schema_name:
-        raise LookupError('only data from "time_series" related schemas, containing time '
-                          'sequences, can be fetched using this function')
     missing_count = [
         not start_date, not end_date,
         (not time_span) and (not trading_time_span)  # this one is kind of 'either-or'
@@ -412,6 +398,9 @@ def fetch_data_by_dates_(schema_name: str, table_name: str,
             "that can be used to perform a database fetch. \nChoose one configuration:"
             "(Two dates 'start-end'; One date, one interval)"
         )
+
+    # retrieve schema and table names
+    schema_name, table_name, is_equity = resolve_time_series_location_(symbol, time_interval, is_equity, mic_code)
 
     # calculate start and end of bracket, if datetime/timedelta was passed
     if start_date and time_span and (end_date is None):

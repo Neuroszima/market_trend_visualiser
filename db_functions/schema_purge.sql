@@ -2,6 +2,7 @@ DROP FUNCTION IF EXISTS "public".generate_financial_view_1day;
 DROP FUNCTION IF EXISTS "public".generate_financial_view_1min;
 DROP FUNCTION IF EXISTS "public".generate_forex_view;
 DROP FUNCTION IF EXISTS "public".check_is_stock;
+DROP FUNCTION IF EXISTS "public".check_is_forex_pair;
 
 DROP VIEW IF EXISTS "public".tracked_indexes;
 DROP VIEW IF EXISTS "public".non_standard_functions;

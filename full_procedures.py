@@ -19,7 +19,7 @@ def time_series_save(
     automates entire process of downloading the data and then saving it directly into database from source
     """
     exotic_markets_warning()
-    is_equity = db_functions.is_stock(symbol)
+    is_equity = db_functions.is_equity(symbol)
     if db_functions.time_series_table_exists(
             symbol, time_interval=time_interval, mic_code=market_identification_code, is_equity=is_equity):
         if db_functions.time_series_latest_timestamp(
@@ -55,7 +55,7 @@ def time_series_update(
     update time series of given symbol/exchange_code pair. Use last record in database to determine the query size
     """
     exotic_markets_warning()
-    is_equity = db_functions.is_stock(symbol)
+    is_equity = db_functions.is_equity(symbol)
     if db_functions.time_series_table_exists(
             symbol, mic_code=market_identification_code, time_interval=time_interval, is_equity=is_equity):
         latest_database_timestamp = db_functions.time_series_latest_timestamp(
@@ -75,7 +75,7 @@ def time_series_update(
             schema_name = "forex_time_series"
             symbol_ = "_".join(symbol.split("/")).upper()
             table_name = f"{symbol_}_{time_interval}"
-        last_datapoint_id = db_functions.last_row_ID(schema_name, table_name)
+        last_datapoint_id = db_functions.fetch_generic_last_ID(schema_name, table_name)
         db_functions.insert_historical_data(
             data, symbol=symbol, mic_code=market_identification_code, time_interval=time_interval,
             is_equity=is_equity, rownum_start=last_datapoint_id+1

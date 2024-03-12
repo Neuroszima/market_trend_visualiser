@@ -402,6 +402,25 @@ ALTER FUNCTION public.check_is_stock(symbol_to_check text) OWNER TO db_user;
 
 
 --
+-- Name: check_is_forex_pair(text); Type: FUNCTION; Schema: public; Owner: db_user
+--
+
+CREATE FUNCTION public.check_is_forex_pair(symbol_to_check text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.forex_pairs
+        WHERE symbol = symbol_to_check
+    );
+END;
+$$;
+
+
+ALTER FUNCTION public.check_is_forex_pair(symbol_to_check text) OWNER TO db_user;
+
+
+--
 -- Name: markets ID; Type: CONSTRAINT; Schema: public; Owner: db_user
 --
 
