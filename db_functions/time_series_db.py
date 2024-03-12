@@ -231,7 +231,7 @@ def create_time_series_(
                 "time_interval": time_interval,
             }
             cur.execute(_create_forex_table.format(**q_dict))
-    assert time_series_table_exists_(symbol, time_interval, is_equity=is_equity, mic_code=mic_code)
+    assert time_series_table_exists_(symbol, time_interval, mic_code=mic_code)
 
 
 def time_series_latest_timestamp_(
