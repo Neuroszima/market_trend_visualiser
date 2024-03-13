@@ -9,7 +9,7 @@ build_schema_instructions_file_path = "\\".join(abspath(__file__).split("\\")[:-
 purge_schema_instructions_file_path = "\\".join(abspath(__file__).split("\\")[:-1] + ['schema_purge.sql'])
 
 
-def __execute_instructions_from_file(instructions_file_path):
+def _execute_instructions_from_file(instructions_file_path):
     with open(instructions_file_path, 'r') as schema_sql:
         instructions_for_db = schema_sql.readlines()
     instructions_for_db = "".join(instructions_for_db)
@@ -21,12 +21,12 @@ def __execute_instructions_from_file(instructions_file_path):
 
 def import_db_structure_():
     """remove every element from the database, for testing purposes"""
-    __execute_instructions_from_file(build_schema_instructions_file_path)
+    _execute_instructions_from_file(build_schema_instructions_file_path)
 
 
 def purge_db_structure_():
     """remove every element from the database, for testing purposes"""
-    __execute_instructions_from_file(purge_schema_instructions_file_path)
+    _execute_instructions_from_file(purge_schema_instructions_file_path)
 
 
 if __name__ == '__main__':

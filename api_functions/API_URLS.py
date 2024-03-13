@@ -10,6 +10,8 @@ LIST_OF_AVAILABLE_CRYPTOCURRENCIES = "/cryptocurrencies"
 LIST_OF_AVAILABLE_CRYPTOCURRENCY_EXCHANGES = "/cryptocurrency_exchanges"
 LIST_OF_AVAILABLE_FOREX_PAIRS = "/forex_pairs"
 LIST_OF_AVAILABLE_INDICES = "/indices"
+LIST_OF_AVAILABLE_BONDS = "/bonds"
+LIST_OF_AVAILABLE_FUNDS = "/funds"
 
 # core functions
 TIME_SERIES_URL = "/time_series"

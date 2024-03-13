@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import unittest
 from random import randint
 
 import psycopg2
 import db_functions, api_functions
 import db_functions.db_helpers as helpers
+from db_functions.db_views import list_nonstandard_views_
 
 import tests.test_db as test_db
 
@@ -21,6 +22,12 @@ class ProcedureTests(unittest.TestCase):
     def setUp(self) -> None:
         db_functions.purge_db_structure()
         self.t_db = test_db.DBTests()
+        self.test_cases = [
+            ("AAPL", "XNGS", "1day", True),  # v
+            ("USD/GBP", None, "1day", False),  # v
+            ("AAPL", "XNGS", "1min", True),  # v
+            ("USD/GBP", None, "1min", False),  # v
+        ]
 
     def assertTableExist(self, table_name, schema_name):
         with psycopg2.connect(**helpers._connection_dict) as conn:
@@ -94,7 +101,14 @@ class ProcedureTests(unittest.TestCase):
             last_allowed_day = end_date
         else:
             last_allowed_day = today
-        last_allowed_day = datetime.fromtimestamp(last_allowed_day.timestamp() - 3 * 24 * 60 * 60)
+
+        # TwelveData has absurdly bad usage of dates from time series
+        # when querying the most fresh daily forex data, sometimes day will move ahead, even when minutely
+        # data is still clocked normally. Even timezone switching don't help.
+        if not is_equity and "day" in time_interval:
+            today += timedelta(days=1)
+
+        last_allowed_day -= timedelta(days=3)
         assert last_allowed_day < last_datapoint_timestamp < today, \
             err_msg % (last_allowed_day, last_datapoint_timestamp, today)
 
@@ -134,7 +148,7 @@ class ProcedureTests(unittest.TestCase):
                 (function_name, schema, 'FUNCTION'), function_list,
                 msg=f"function not found {function_name}"
             )
-        views_list = helpers.list_nonstandard_views_()
+        views_list = list_nonstandard_views_()
         for view in views_in_database:
             self.assertIn(view, views_list, msg=f"view not found {view[1]}")
 
@@ -160,19 +174,11 @@ class ProcedureTests(unittest.TestCase):
 
     def test_save_ticker_fully(self):
         """this checks a whole download process so it needs a lot of tokens"""
-        # add a couple of definitions to the database - XAU/USD as forex pair, AAPL as equity
+        # add a couple of definitions to the database - USD/GBP as forex pair, AAPL as equity
         full_procedures.rebuild_database_destructively()
         self.t_db.save_samples_for_tests()
 
-        # real tests
-        test_cases = [
-            ("AAPL", "XNGS", "1day", True),
-            ("XAU/USD", None, "1day", False),
-            ("AAPL", "XNGS", "1min", True),
-            ("XAU/USD", None, "1min", False),
-        ]
-
-        for symbol_, mic, timeframe, is_equity in test_cases:
+        for symbol_, mic, timeframe, is_equity in self.test_cases:
             params = {
                 "symbol": symbol_,
                 "market_identification_code": mic,
@@ -195,16 +201,10 @@ class ProcedureTests(unittest.TestCase):
         """first download and save the ticker partially, then update it up to the most recent date (possibly today)"""
         full_procedures.rebuild_database_destructively()
         # using predetermined data to fill in the database with couple necessary rows
-        # following saves XAU/USD pair, so it is automatically checked if it detects it as ticker or not
+        # following saves USD/GBP pair, so it is automatically checked if it detects it as ticker or not
         self.t_db.save_samples_for_tests()
-        test_cases = [
-            ("AAPL", "XNGS", "1day", True),  # v
-            ("XAU/USD", None, "1day", False),  # v
-            ("AAPL", "XNGS", "1min", True),  # v
-            ("XAU/USD", None, "1min", False),  # v
-        ]
 
-        for symbol_, mic, timeframe, is_equity in test_cases:
+        for symbol_, mic, timeframe, is_equity in self.test_cases:
             update_params = {
                 "symbol": symbol_,
                 "market_identification_code": mic,

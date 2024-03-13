@@ -1,18 +1,50 @@
 from math import ceil
-from pprint import pprint
-from time import time, sleep
-from ast import literal_eval
 from datetime import datetime
 from typing import Literal, Generator
 
-from api_functions.miscellaneous_api import parse_get_response_, api_key_switcher_
+from api_functions.miscellaneous_api import parse_get_response_
 from minor_modules import time_interval_sanitizer
 
 TIMESTAMP = dict[Literal['datetime', 'unix_time'], [str, int]]
 
 
+def get_latest_datapoint_(
+        symbol: str, api_key_pair: tuple, mic_code: str = None, exchange: str = None,
+        time_interval: str = None, timezone: str = None, ask_stock: bool = True) -> dict:
+    """
+    ask api to give the latest point of data from the data provider
+    in terms of minutely data, this can be late about 2-3 minutes usually
+    use other methods to get live datafeed
+    """
+    if not time_interval:
+        time_interval = "1min"
+    if ask_stock:
+        if not mic_code:
+            mic_code = "XNGS"
+    querystring = {
+        "interval": time_interval,
+        "symbol": symbol,
+        "mic_code": mic_code,
+        "outputsize": 1,
+    }
+
+    # following is nearly always optional
+    if timezone:
+        querystring['timezone'] = timezone
+    if exchange:
+        querystring['exchange'] = exchange
+
+    response_result, _ = parse_get_response_(
+        querystring,
+        request_type="time_series",
+        data_type="json",
+        api_key_pair=api_key_pair
+    )
+    return response_result['values'][0]
+
+
 @time_interval_sanitizer()
-def obtain_earliest_timestamp_(
+def get_earliest_timestamp_(
         symbol: str, api_key_pair: tuple, mic_code: str = None, exchange: str = None,
         time_interval: str = None, timezone: str = None, ask_stock: bool = True) -> TIMESTAMP:
     """ask api for the earliest datapoint of certain ticker in their database"""
@@ -208,7 +240,7 @@ def download_market_ticker_history_(
     # no more need for sleep of 8 seconds and calculations. Simply invoke "next(key_switcher)" to get the
     # delay calculated automatically
     if not start_date:
-        earliest_timestamp = obtain_earliest_timestamp_(
+        earliest_timestamp = get_earliest_timestamp_(
             symbol, time_interval=time_interval, mic_code=mic_code, api_key_pair=next(key_switcher))
     else:
         earliest_timestamp = start_date
@@ -247,6 +279,8 @@ def download_market_ticker_history_(
         end_date=end_date, ask_stock=ask_equity)
     for j in range(iterations):
         partial_data: dict = download_time_series_(**download_params, api_key_pair=next(key_switcher))
+        if not partial_data.get('values'):
+            print(partial_data)
 
         # zeroth element in further queries would overlap and appear twice so its later truncated
         if j == 0:

@@ -38,6 +38,8 @@ def parse_get_response_(
             endpoint = LIST_OF_AVAILABLE_EXCHANGES
         case "list stocks":
             endpoint = LIST_OF_STOCKS_SYMBOLS
+        case "list etfs":
+            endpoint = LIST_OF_AVAILABLE_ETFS
         case "token_usage":
             endpoint = API_USAGE_URL  # proper key usage is handled in specified function
         case _:
@@ -155,6 +157,40 @@ def get_all_exchanges_(
     return response_result['data']
 
 
+def get_all_etfs_(
+        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> list[dict]:
+    """
+    obtain a list of etf with their corresponding mic's, countries and other information
+
+    :param api_key_pair: tuple with (key_identifier, api_key) to be used to gather data
+    :param data_type: return as csv or json formatted data
+    :param additional_params: parameters like "show_plans", "delimiter", "timezone" and other that are
+    provided by TwelveData API to narrow down the searched parameters
+    """
+    if not additional_params:
+        additional_params = {'show_plan': True}
+    response_result, _ = parse_get_response_(
+        additional_params, request_type="list etfs", data_type=data_type, api_key_pair=api_key_pair)
+    return response_result['data']
+
+
+def get_all_indices_(
+        api_key_pair: tuple, data_type: str, additional_params: dict | None = None) -> list[dict]:
+    """
+    obtain a list of etf with their corresponding mic's, countries and other information
+
+    :param api_key_pair: tuple with (key_identifier, api_key) to be used to gather data
+    :param data_type: return as csv or json formatted data
+    :param additional_params: parameters like "show_plans", "delimiter", "timezone" and other that are
+    provided by TwelveData API to narrow down the searched parameters
+    """
+    if not additional_params:
+        additional_params = {'show_plan': True}
+    response_result, _ = parse_get_response_(
+        additional_params, request_type="list indices", data_type=data_type, api_key_pair=api_key_pair)
+    return response_result['data']
+
+
 def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
     """
     Prepare a collection of usable API keys, and use them cyclically
@@ -183,8 +219,8 @@ def api_key_switcher_(permitted_keys: Optional[list[str]] = None):
             yield key_name, keys_dict[key_name][0]
             keys_dict[key_name][1] = True
             # pprint(keys_dict)
-        if (time_passed := perf_counter() - start) < 7.97:  # 8 requests per minute check
-            sleep(7.97 - time_passed)
+        if (time_passed := perf_counter() - start) < 8.05:  # 8 requests per minute check
+            sleep(8.05 - time_passed)
         # keys have "clocked out" - they can be used again without danger of "too fast" error
         for key_name in permitted_keys:
             keys_dict[key_name][1] = False

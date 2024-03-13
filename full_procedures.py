@@ -29,7 +29,7 @@ def time_series_save(
 
         data = api_functions.download_market_ticker_history(
             symbol=symbol, mic_code=market_identification_code, verbose=verbose,
-            time_interval=time_interval, key_switcher=key_switcher
+            time_interval=time_interval, key_switcher=key_switcher,
         )
         db_functions.insert_historical_data(
             data, symbol=symbol, mic_code=market_identification_code, time_interval=time_interval,
