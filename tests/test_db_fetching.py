@@ -66,7 +66,7 @@ class DBFetchTests(unittest.TestCase):
                 self.assertEqual(data_candle['volume'], fetched_candle[6])
         except AssertionError as e:
             print(e)
-            raise AssertionError(f'candle do not match data: f={fetched_candle} d={data_candle}')
+            raise AssertionError(f'candle do not match data:\n f={fetched_candle}\n d={data_candle}')
 
     def prepare_table_for_case(self, symbol: str, time_interval: str, is_equity: bool, mic: str, inserted_rows=1):
         """prepare a series of operations for testing database functions"""
@@ -532,7 +532,7 @@ class DBFetchTests(unittest.TestCase):
             for pair in [(start, start_fetch), (end, end_fetch), (middle, middle_fetch)]:
                 self.assertCandleMatchesData(pair[1], pair[0], time_conversion, is_equity)
 
-    def test_fetch_datapoint_raw_by_pk(self):
+    def test_fetch_generic_datapoint_by_ID(self):
         """test fetching a single point of data using primary key of the table in question"""
         for symbol_, time_interval, mic, is_equity in self.time_table_cases:
             schema_name, table_name, time_conversion = t_helpers.form_test_essentials(
@@ -562,7 +562,7 @@ class DBFetchTests(unittest.TestCase):
                     time_string_conversion=time_conversion, is_equity=is_equity
                 )
 
-    def test_fetch_data_by_IDs(self):
+    def test_fetch_generic_data_by_IDs(self):
         with self.assertRaises(UndefinedTable):
             db_functions.fetch_generic_range_by_IDs('publi', ''.join(choices('awgv', k=7)))
 
@@ -626,13 +626,164 @@ class DBFetchTests(unittest.TestCase):
             for fetched_point, data_point in zip(fetched_timeseries, data_to_check):
                 self.assertCandleMatchesData(fetched_point, data_point, time_conversion, is_equity)
 
-    @unittest.skip("this is a test stub")
     def test_fetch_data_by_timestamps(self):
         """test fetching subset of time series using dates and commonly used identifiers (like symbol/mic... etc.)"""
-        for case in self.time_table_cases:
-            symbol_, time_interval, mic, is_equity = case
+        # function signature:
+        # db_functions.fetch_data_by_dates(
+        #     symbol: str, time_interval: str, is_equity: bool, mic_code: str,
+        #     start_date: datetime, end_date: datetime, time_span: timedelta, trading_time_span: int)
+        mock_date = datetime(year=randint(2000, 2010), month=randint(1, 12), day=randint(1, 20))
+        exception_cases = [
+            # too few date arguments
+            ("AAPL", "1min", True, "XNGS", None, None, None, None, LookupError),
+            ("AAPL", "1min", True, "XNGS", mock_date, None, None, None, LookupError),
+            ("AAPL", "1min", True, "XNGS", None, mock_date, None, None, LookupError),
+            ("AAPL", "1min", True, "XNGS", None, None, timedelta(days=randint(1, 49)), None, LookupError),
+            ("AAPL", "1min", True, "XNGS", None, None, None, randint(1, 49), LookupError),
+
+            # too few arguments but also wrong table resolve data:
+            # wrong date combination errors tripping first rule
+            ("AAAPL", "1min", True, "XNGS", None, None, None, randint(1, 49), LookupError),
+            ("AAAPL", "1min", None, "XNGS", None, None, None, randint(1, 49), LookupError),
+            ("AAAPL", "1day", None, "XNGS", None, None, None, randint(1, 49), LookupError),
+            ("AAAPL", "1day", None, None, None, None, None, randint(1, 49), LookupError),
+            ("USD/GBP", "7apj", None, None, None, None, None, randint(1, 49), LookupError),  # -> time sanitizer
+            ("USD/GBP", "1day", None, "XNGS", None, None, None, randint(1, 49), LookupError),
+            ("USD/GBP", "1day", True, "XNGS", None, None, None, randint(1, 49), LookupError),
+
+            # bad symbols, that don't resolve inside the schema/table check
+            ("AAAAPL", "1min", None, None,
+             mock_date, None, None, randint(1, 49),  db_functions.DataUncertainError),
+            ("USD/CAD", "1min", None, "XNAADOAWI",
+             mock_date, None, None, randint(1, 49),  db_functions.DataUncertainError),
+
+            # time sanitizer tripping before everything further
+            # it should actually be distinguished, probably by intercepting a error message that should
+            # include some text hinting at this part triggering, but let's leave it for a moment
+            ("USD/GBP", "7apj", False, None, mock_date, None, None, randint(1, 49), ValueError),
+            ("USD/GBP", "7apj", True, "XNGS", mock_date, None, None, randint(1, 49), ValueError),
+            ("AAPL", "7apj", True, "XNGS", mock_date, None, None, randint(1, 49), ValueError),
+
+            # next, Value errors should get triggered (and other affiliated), while checking table-resolving
+            # internal checks for absence/presence of MIC in the identifier
+            ("USD/GBP", "1min", None, "XNGS", mock_date, None, None, randint(1, 49), ValueError),
+            ("AAPL", "1min", None, None, mock_date, None, None, randint(1, 49), ValueError),
+            ("AAPL", "1min", True, None, mock_date, None, None, randint(1, 49), ValueError),
+            # # these particular is wrong in other way (stock as f_pair), but we check internal MIC identifier still
+            ("AAPL", "1min", False, "XNGS", mock_date, None, None, randint(1, 49), ValueError),
+            ("AAPL", "1min", False, "XANSAFD", mock_date, None, None, randint(1, 49), ValueError),
+            ("AAPL", "1min", False, "XANSAFD", mock_date, None, None, randint(1, 49), ValueError),
+
+            # various combinations of improper data -> error resolving table locations (proper date input structure)
+            ("AAAPL", "1min", None, "XNGS",
+             mock_date, None, None, randint(1, 49), db_functions.DataUncertainError),
+            ("AAPL", "1min", True, "XNAAGS",
+             mock_date, None, None, randint(1, 49), db_functions.TimeSeriesNotFoundError),
+            ("AAAPL", "1day", None, None,
+             mock_date, None, None, randint(1, 49), db_functions.DataUncertainError),
+            # # bad symbol -> when forced (lack of actual table) and when not forced, lack of db data
+            ("AAAPL", "1day", True, "XNGS",
+             mock_date, None, None, randint(1, 49), db_functions.TimeSeriesNotFoundError),
+            ("AAAPL", "1min", None, None,
+             mock_date, None, None, randint(1, 49), db_functions.DataUncertainError),
+            ("USD/GBP", "1min", False, None,
+             mock_date, None, None, randint(1, 49), db_functions.TimeSeriesNotFoundError),
+        ]
+        for case in exception_cases:
+            symbol, time_interval, is_equity, mic_code = case[0:4]
+            start_date, end_date, time_span, trading_time_span = case[4:-1]
+            error_raised = case[-1]
+            with self.assertRaises(error_raised):
+                print(case)
+                db_functions.fetch_data_by_dates(
+                    symbol, time_interval, is_equity, mic_code,
+                    start_date, end_date, time_span, trading_time_span
+                )
+
+        for table_case in self.time_table_cases:
+            symbol_, time_interval, mic, is_equity = table_case
             schema_name, table_name, time_conversion = t_helpers.form_test_essentials(
                 symbol_, time_interval, mic, is_equity)
+            inserted_data = self.prepare_table_for_case(
+                symbol_, time_interval, is_equity, mic, inserted_rows=25)
+
+            # below is pretty much 1-to-1 copy of cases from "calculate fetch bracket"
+            sub_cases = []
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[0]['datetime_object'],
+                ending_timestamp=inserted_data[-1]['datetime_object']
+            ))
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(30, 90)),
+                ending_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(30, 90))
+            ))
+            sub_cases.extend(t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[randint(3, 10)]['datetime_object'],
+                ending_timestamp=inserted_data[randint(20, 24)]['datetime_object']
+            ))
+            c = t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(60, 70)),
+                ending_timestamp=inserted_data[0]['datetime_object'] - timedelta(days=randint(10, 15)),
+                raised_exception=db_functions.DataNotPresentError,
+            )
+            c.pop(3)
+            sub_cases.extend(c)
+            c = t_helpers.time_bracket_case_generator(
+                reference_dataset=inserted_data,
+                starting_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(10, 15)),
+                ending_timestamp=inserted_data[-1]['datetime_object'] + timedelta(days=randint(60, 70)),
+                raised_exception=db_functions.DataNotPresentError,
+            )
+            c.pop()
+            sub_cases.extend(c)
+            if "day" in time_interval:
+                prior_weekday = next((
+                    day for day in inserted_data if day['datetime_object'].isoweekday() == 5
+                ))['datetime_object']
+                prior_weekday += timedelta(days=1)
+                next_weekday = prior_weekday + timedelta(days=7 + randint(1, 2))
+                sub_cases.extend(t_helpers.time_bracket_case_generator(
+                    reference_dataset=inserted_data,
+                    starting_timestamp=prior_weekday,
+                    ending_timestamp=next_weekday,
+                ))
+
+            # these cases should in actuality reflect the timestamp fetch results and not row ID
+            # checks, unlike previous methods (calculate_fetch_bracket namely)
+            sub_cases.extend([
+                (inserted_data[0]['datetime_object'], None, None,
+                 len(inserted_data) * 3, (0, len(inserted_data)-1), None),
+                (inserted_data[0]['datetime_object'], None, timedelta(days=randint(300, 500)),
+                 None, (0, len(inserted_data) - 1), None),
+                (None, inserted_data[-1]['datetime_object'], timedelta(days=randint(300, 500)),
+                 None, (0, len(inserted_data) - 1), None),
+                (None, inserted_data[-1]['datetime_object'], None,
+                 len(inserted_data) * 3, (0, len(inserted_data) - 1), None),
+            ])
+
+            for id_, sub_case in enumerate(sub_cases):
+                start_date, end_date, time_span, trading_time_span, predicted_answer, raised_exception = sub_case
+                message = f'test case: {id_=}, main:{table_case} sub: {sub_case}'
+                print(message)
+                if raised_exception:
+                    # we actually don't need to raise exception, just return
+                    # empty list, that's far more forgiving and raising would have been unnecessarily complicated
+                    data_fetched = db_functions.fetch_data_by_dates(
+                            symbol_, time_interval, is_equity, mic_code=mic, start_date=start_date,
+                            end_date=end_date, time_span=time_span, trading_time_span=trading_time_span)
+                    self.assertEqual(data_fetched, [])
+                    continue
+                a, b = predicted_answer
+                inserted_answer_data = inserted_data[a:b] + [inserted_data[b]]
+                data_fetched = db_functions.fetch_data_by_dates(
+                    symbol_, time_interval, is_equity, mic_code=mic, start_date=start_date,
+                    end_date=end_date, time_span=time_span, trading_time_span=trading_time_span)
+                for fetched_candle, inserted_candle in zip(data_fetched, inserted_answer_data):
+                    self.assertCandleMatchesData(fetched_candle, inserted_candle, time_conversion, is_equity)
 
 
 if __name__ == '__main__':

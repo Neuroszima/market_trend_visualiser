@@ -98,7 +98,7 @@ where series.datetime {operation} TIMESTAMP '{search_date}' ORDER BY series.date
 """
 _query_get_data_by_timestamps = """
 SELECT * FROM \"{schema_name}\".\"{table_name}\" series 
-WHERE series.datetime {earlier_bracket} {optional_and} {later_bracket} {optional_limit};
+WHERE {earlier_bracket} {optional_and} {later_bracket} {optional_order} {optional_limit};
 """
 
 
@@ -112,6 +112,10 @@ def resolve_time_series_location_(
         is_forex_pair = is_forex_pair_(symbol)
     else:
         is_forex_pair = not is_equity
+    # hinting erroneous database management
+    if is_equity and is_forex_pair:
+        raise DataUncertainError_("Cannot resolve symbol. It cannot be both stock/forex_pair, "
+                                  "but it seems it is in both tables at the same time!")
 
     if is_equity:
         if mic_code is None:
@@ -416,21 +420,24 @@ def fetch_data_by_dates_(
 
     if start_date and end_date:
         q = {
-            "earlier_bracket": f">= TIMESTAMP '{start_date}'",
+            "earlier_bracket": f"series.datetime >= TIMESTAMP '{start_date}'",
             "optional_and": "AND",
-            "later_bracket": f"<= TIMESTAMP '{end_date}'",
+            "later_bracket": f"series.datetime <= TIMESTAMP '{end_date}'",
+            "optional_order": "",
         }
     elif end_date is not None and trading_time_span is not None:
         q = {
             "earlier_bracket": "",
             "optional_and": "",
-            "later_bracket": f"<= TIMESTAMP '{end_date}'",
+            "later_bracket": f"series.datetime <= TIMESTAMP '{end_date}'",
+            "optional_order": "order by series.datetime desc"
         }
     elif start_date is not None and trading_time_span is not None:
         q = {
-            "earlier_bracket": f">= TIMESTAMP '{start_date}'",
+            "earlier_bracket": f"series.datetime >= TIMESTAMP '{start_date}'",
             "optional_and": "",
             "later_bracket": "",
+            "optional_order": "",
         }
     else:
         d = (schema_name, table_name, start_date, end_date, time_span, trading_time_span)
@@ -447,4 +454,4 @@ def fetch_data_by_dates_(
             data = cur.fetchall()
     except UndefinedTable:
         raise TimeSeriesNotFoundError_(f'series: {schema_name}.{table_name} does not exist')
-    return data
+    return sorted(data, key=lambda r: r[0])
