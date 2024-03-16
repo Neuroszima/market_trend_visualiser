@@ -56,13 +56,13 @@ class PriceChart:
         # get to know if elements are dicts or tuples (provider origin or db origin)
         if isinstance(data[0], tuple):
             # data from database
-            self._series_timestamps = [d[1] for d in data]
-            self._series_lows = [d[1] for d in data]
-            self._series_highs = [d[1] for d in data]
-            self._series_opens = [d[1] for d in data]
-            self._series_closes = [d[1] for d in data]
+            self._series_timestamps = [d[1] for d in data]  # already a datetime object
+            self._series_opens = [d[2] for d in data]
+            self._series_closes = [d[3] for d in data]
+            self._series_highs = [d[4] for d in data]
+            self._series_lows = [d[5] for d in data]
             if is_stock:
-                self._series_volumes = [d[1] for d in data]
+                self._series_volumes = [d[6] for d in data]
         elif isinstance(data[0], dict):
             # data downloaded
             # convert timestamps into datetime objects
@@ -73,10 +73,10 @@ class PriceChart:
             else:
                 raise ValueError(timeframe)
             self._series_timestamps = [datetime.strptime(d["datetime"], time_conversion) for d in data]
-            self._series_lows = [d["low"] for d in data]
-            self._series_highs = [d["high"] for d in data]
             self._series_opens = [d["open"] for d in data]
             self._series_closes = [d["close"] for d in data]
+            self._series_highs = [d["high"] for d in data]
+            self._series_lows = [d["low"] for d in data]
             if is_stock:
                 self._series_volumes = [d["volume"] for d in data]
         else:

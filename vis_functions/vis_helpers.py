@@ -53,7 +53,7 @@ CHART_SETTINGS = {
         "VOLUME_BAR_BODY": "+50%",  # about 50% brighter -> +50% of the diff from 255 to main
     # volume candles are also transparent
     },
-    "NINJATRADER_PERSONAL_CUSTOM": {
+    "NINJATRADER_SLATE_DARK": {
         "CHART_MAIN_PLOT": rgb_to_matlab(255, 255, 255),
         "CHART_TICKS_SPINES": rgb_to_matlab(255, 255, 255),
         "CHART_BG": rgb_to_matlab(4, 4, 4),
@@ -77,12 +77,18 @@ def split_chart_daily(data: list[datetime], timeframe: str) -> list[bool]:
     This is actually equivalent in data timestamps for both, but for stocks day happens to be a new market
     open in the morning, while forex has 24h cycle of trading.
     """
+    if "day" in timeframe:
+        param = "month"
+    elif "h" in timeframe or "min" in timeframe:
+        param = "day"
+    else:
+        return [False for _ in range(len(data))]
     if len(data) == 1:
         return [False]
     marked_data = []
     for i, timestamp in enumerate(data):
         if i == 0:
-            if timestamp.day != data[i+1].day:
+            if getattr(timestamp, param) != getattr(data[i+1], param):
                 marked_data.append(False)
                 marked_data.append(True)  # unfortunate case
             else:
@@ -90,14 +96,14 @@ def split_chart_daily(data: list[datetime], timeframe: str) -> list[bool]:
                 marked_data.append(False)
             continue
         if i == 1: continue
-        if timestamp.day != data[i-1].day:
+        if getattr(timestamp, param) != getattr(data[i+1], param):
             marked_data.append(True)
         else:
             marked_data.append(False)
     return marked_data
 
 
-def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, ...]]:
+def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, bool, bool]]:
     """
     select periods of datapoints at which there should be visible divisor line drawn on the chart
 
@@ -119,7 +125,7 @@ def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, 
 
     major_time_splits = split_chart_daily(data, timeframe)
 
-    graphical_splitters = []
+    graphical_splitters: list[tuple[bool, bool]] = []
     if "min" in timeframe:
         for dp in data:
             market_open_ = datetime(year=dp.year, month=dp.month, day=dp.day, minute=30, hour=13)
@@ -129,19 +135,19 @@ def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, 
                 True if minutes_from_open % chosen_splitter[0] == 0 else False,  # very light and pale lines
                 True if minutes_from_open % chosen_splitter[1] == 0 else False,  # slightly more visible lines
             )
-            graphical_splitters.append((dp, *drawing_informations))
+            graphical_splitters.append(drawing_informations)
     elif "day" in timeframe:
         for dp in data:
             drawing_info = (
                 True if dp.isoweekday() == 1 else False,  # split weeks on mondays -> slightly more visible line
                 False  # no thicker lines really
             )
-            graphical_splitters.append((dp, *drawing_info))
+            graphical_splitters.append(drawing_info)
     else:
         raise ValueError("timeframe not supported")
 
-    graphical_splitters = [
-        (bigger_splitter, *small_splitters)
+    graphical_splitters: list[tuple[bool, bool, bool]] = [
+        (bigger_splitter, small_splitters[0], small_splitters[1])
         for bigger_splitter, small_splitters
         in zip(major_time_splits, graphical_splitters)
     ]
