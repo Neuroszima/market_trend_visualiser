@@ -1,8 +1,10 @@
 from datetime import datetime
-
+from typing import Literal, Optional
 
 MINUTELY_CHART_SPLITTERS = [(5, 15, 45), (15, 60, 180), (30, 180, 540), (60, 360, 1080), (180, 1080, 3240)]
 DAILY_CHART_SPLITTERS = 1  # what day will have a timestamp shown in chart
+AVAILABLE_THEMES = Optional[Literal[
+    "OSCILLOSCOPE_FROM_90s", "FREEDOM24_DARK_TEAL", "TRADINGVIEW_WHITE", "NINJATRADER_SLATE_DARK"]]
 
 
 def rgb_to_matlab(r, g, b) -> list | tuple:
@@ -19,6 +21,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(3, 9, 3),
         "CHART_TEXT_COLOR": rgb_to_matlab(4, 232, 14),
         "CHART_TEXT_FONT": 'monospace',
+        "CHART_TEXT_FONT_SIZE": 11,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(5, 177, 17),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(4, 113, 12),
         "BULL_CANDLE_BODY": rgb_to_matlab(4, 222, 14),
@@ -26,12 +29,13 @@ CHART_SETTINGS = {
         "CANDLE_BORDER": rgb_to_matlab(4, 222, 14),
         "VOLUME_BAR_BODY": rgb_to_matlab(4, 120, 14),
     },
-    "DARK_TEAL_FREEDOM24": {
+    "FREEDOM24_DARK_TEAL": {
         "CHART_MAIN_PLOT": rgb_to_matlab(118, 121, 132),
         "CHART_TICKS_SPINES": rgb_to_matlab(75, 77, 82),
         "CHART_BG": rgb_to_matlab(30, 34, 45),
-        "CHART_TEXT_COLOR": rgb_to_matlab(4, 232, 14),
+        "CHART_TEXT_COLOR": rgb_to_matlab(138, 141, 145),
         "CHART_TEXT_FONT": 'Segoe UI',  # not original one, but from inspect it is one that they use
+        "CHART_TEXT_FONT_SIZE": 10,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(97, 98, 101),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(42, 46, 57),
         "BULL_CANDLE_BODY": rgb_to_matlab(38, 166, 154),
@@ -45,6 +49,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(255, 255, 255),
         "CHART_TEXT_COLOR": rgb_to_matlab(19, 23, 34),
         "CHART_TEXT_FONT": 'Trebuchet MS',
+        "CHART_TEXT_FONT_SIZE": 12,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(149, 152, 161),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(243, 243, 243),
         "BULL_CANDLE_BODY": rgb_to_matlab(8, 153, 129),
@@ -59,6 +64,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(4, 4, 4),
         "CHART_TEXT_COLOR": rgb_to_matlab(255, 255, 255),
         "CHART_TEXT_FONT": 'Arial',
+        "CHART_TEXT_FONT_SIZE": 9,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(120, 120, 120),  # there are no main separator in my setting
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(80, 80, 80),
         "BULL_CANDLE_BODY": rgb_to_matlab(53, 206, 53),
@@ -96,9 +102,12 @@ def split_chart_daily(data: list[datetime], timeframe: str) -> list[bool]:
                 marked_data.append(False)
             continue
         if i == 1: continue
-        if getattr(timestamp, param) != getattr(data[i+1], param):
-            marked_data.append(True)
-        else:
+        try:
+            if getattr(timestamp, param) != getattr(data[i+1], param):
+                marked_data.append(True)
+            else:
+                marked_data.append(False)
+        except IndexError:
             marked_data.append(False)
     return marked_data
 

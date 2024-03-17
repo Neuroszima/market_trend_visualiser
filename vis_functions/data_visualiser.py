@@ -4,15 +4,16 @@ from typing import Literal
 
 from matplotlib import pyplot as plt
 # from matplotlib import animation
-from matplotlib.animation import FuncAnimation, PillowWriter    # noqa
+from matplotlib.animation import FuncAnimation, PillowWriter  # noqa
 from matplotlib.axes import Axes
+from matplotlib.axis import Axis
 # from matplotlib.artist import Artist
 from matplotlib.figure import Figure, SubFigure
 # from matplotlib.lines import Line2D
 from matplotlib.spines import Spine
 
 from vis_functions.vis_helpers import chart_split_lines, resolve_timeframe_name
-
+from vis_functions.vis_helpers import AVAILABLE_THEMES, CHART_SETTINGS
 
 CHART_FILE_LOCATION = "\\".join(abspath(__file__).split("\\")[:-2] + ["charts"])
 SERIES_DEFINER = Literal['close', 'open', 'volume', 'low', 'high']
@@ -26,13 +27,13 @@ class PriceChart:
     """
 
     def __init__(self, data: list[tuple] | list[dict], symbol: str, timeframe: str, market_code: str,
-                 is_stock: bool, size_x: int, size_y: int,
-                 dpi: int | None = None):
+                 is_stock_: bool, size_x: int, size_y: int, dpi: int = 300, color_theme: AVAILABLE_THEMES = None,
+                 chart_type: Literal['simple_open', 'simple_close', 'candlestick'] = None):
         # disassemble data for various purposes
         # for example we could "show close" only, or draw entire candlesticks
         self.timeframe = timeframe
         self.market_code = market_code
-        self.is_stock = is_stock
+        self.is_stock = is_stock_
         self.symbol = symbol
         self._series_timestamps: list[datetime] | None = None
         self._series_lows: list[float | int] | None = None
@@ -40,7 +41,7 @@ class PriceChart:
         self._series_opens: list[float | int] | None = None
         self._series_closes: list[float | int] | None = None
         self._series_volumes: list[int] | None = None
-        self._disassemble(data, is_stock)
+        self._disassemble(data, is_stock_)
 
         # chart
         self.size_x = size_x
@@ -49,7 +50,9 @@ class PriceChart:
         self.title: str | None = None
         self.figure: Figure | None = None
         self.main_chart: Axes | None = None
-        self.dpi = dpi if dpi else 300
+        self.dpi = dpi
+        self.color_theme = "DARK_TEAL_FREEDOM24" if color_theme is None else color_theme
+        self.chart_type = "simple_close" if chart_type is None else chart_type
 
     def _disassemble(self, data: list[tuple | dict], is_stock: bool):
         """disassemble time series data into separate components for future reference"""
@@ -66,12 +69,12 @@ class PriceChart:
         elif isinstance(data[0], dict):
             # data downloaded
             # convert timestamps into datetime objects
-            if timeframe in ['1day']:
+            if timeframe_ in ['1day']:
                 time_conversion = '%Y-%m-%d'
-            elif timeframe in ['1min']:
+            elif timeframe_ in ['1min']:
                 time_conversion = '%Y-%m-%d %H:%M:%S'
             else:
-                raise ValueError(timeframe)
+                raise ValueError(timeframe_)
             self._series_timestamps = [datetime.strptime(d["datetime"], time_conversion) for d in data]
             self._series_opens = [d["open"] for d in data]
             self._series_closes = [d["close"] for d in data]
@@ -84,8 +87,13 @@ class PriceChart:
 
     def prepare_chart_space(self) -> Figure:
         figure: Figure = plt.figure(
-            constrained_layout=True, figsize=(self.size_x/self.dpi, self.size_y/self.dpi))
-        figure.subplots(nrows=1, ncols=1)
+            constrained_layout=True, figsize=(self.size_x / self.dpi, self.size_y / self.dpi),
+            facecolor=CHART_SETTINGS[self.color_theme]['CHART_BG'],
+        )
+        figure.subplots(
+            nrows=1, ncols=1, subplot_kw={"facecolor": CHART_SETTINGS[self.color_theme]['CHART_BG']},
+            gridspec_kw={'wspace': 0.5, 'hspace': 0.245,}
+        )
         self.main_chart: Axes = figure.get_axes()[0]
         timeframe = resolve_timeframe_name(self.timeframe)
         self.title = f"{self.symbol}_{self.market_code}" if self.is_stock else f"{self.symbol}"
@@ -94,10 +102,35 @@ class PriceChart:
         self.main_chart.spines: dict[str, Spine]  # noqa
         for e, spine in self.main_chart.spines.items():
             spine.set_linewidth(0.5)
+            if e in ["left", 'top']:
+                spine.set_visible(False)
+            spine.set(color=CHART_SETTINGS[self.color_theme]["CHART_SMALL_SEPARATORS"])
 
         self.main_chart.set_title(
-            self.title, loc="left", fontfamily="Arial", fontstyle='normal',
-            fontweight='normal', fontvariant='small-caps', fontstretch='ultra-condensed')
+            self.title, loc="left", fontstyle='normal', fontweight='normal', fontvariant='small-caps',
+            color=CHART_SETTINGS[self.color_theme]["CHART_TEXT_COLOR"],
+            fontfamily=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT"],
+            fontsize=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"],
+            fontstretch='ultra-condensed')
+
+        self.main_chart.yaxis: Axis  # noqa
+        self.main_chart.yaxis.set_tick_params(
+            which="major", left=False, right=True, direction="in",
+            color=CHART_SETTINGS[self.color_theme]["CHART_MAIN_SEPARATORS"],
+            labelcolor=CHART_SETTINGS[self.color_theme]["CHART_TEXT_COLOR"],
+            labelfontfamily=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT"],
+            labelsize=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"],
+            labelleft=False, labelright=True,
+        )
+
+        self.main_chart.xaxis: Axis  # noqa
+        self.main_chart.xaxis.set_tick_params(
+            which="major", direction="in",
+            color=CHART_SETTINGS[self.color_theme]["CHART_MAIN_SEPARATORS"],
+            labelcolor=CHART_SETTINGS[self.color_theme]["CHART_TEXT_COLOR"],
+            labelsize=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"],
+            labelfontfamily=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT"],
+        )
 
         return figure
 
@@ -115,12 +148,17 @@ class PriceChart:
 if __name__ == '__main__':
     from random import seed
     from tests.t_helpers import generate_random_time_sample
+
     seed(2346346)
 
-    symbol, timeframe, market_code, is_stock = "AAPL", "1min", "XNGS", True
+    symbol, timeframe_, market_code, is_stock = "AAPL", "1min", "XNGS", True
     series_1min = generate_random_time_sample("1min", is_equity=True, span=25)  # sample means single candles here
     series_1day = generate_random_time_sample("1day", is_equity=True, span=25)
-    c = PriceChart(series_1min, symbol, timeframe, market_code, is_stock, 1200, 1200, dpi=300)
+    c = PriceChart(series_1min, symbol, timeframe_, market_code, is_stock, 1200, 1200,
+                   # color_theme="NINJATRADER_SLATE_DARK")
+                   # color_theme="FREEDOM24_DARK_TEAL")
+                   color_theme="OSCILLOSCOPE_FROM_90s")
+                   # color_theme="TRADINGVIEW_WHITE")
     # c = PriceChart()
     c.make_chart()
     c.save()
