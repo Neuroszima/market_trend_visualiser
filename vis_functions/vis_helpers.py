@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-MINUTELY_CHART_SPLITTERS = [(5, 15, 45), (15, 60, 180), (30, 180, 540), (60, 360, 1080), (180, 1080, 3240)]
+MINUTELY_CHART_SPLITTERS = [
+    *[(5*i, 15*i, 40*i) for i in range(1, 15)], (120, 360, 720), (180, 1080, 3240)]
+print(MINUTELY_CHART_SPLITTERS)
 DAILY_CHART_SPLITTERS = 1  # what day will have a timestamp shown in chart
 AVAILABLE_THEMES = Optional[Literal[
     "OSCILLOSCOPE_FROM_90s", "FREEDOM24_DARK_TEAL", "TRADINGVIEW_WHITE", "NINJATRADER_SLATE_DARK"]]
@@ -21,7 +23,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(3, 9, 3),
         "CHART_TEXT_COLOR": rgb_to_matlab(4, 232, 14),
         "CHART_TEXT_FONT": 'monospace',
-        "CHART_TEXT_FONT_SIZE": 11,
+        "CHART_TEXT_FONT_SIZE": 9,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(5, 177, 17),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(4, 113, 12),
         "BULL_CANDLE_BODY": rgb_to_matlab(4, 222, 14),
@@ -32,10 +34,10 @@ CHART_SETTINGS = {
     "FREEDOM24_DARK_TEAL": {
         "CHART_MAIN_PLOT": rgb_to_matlab(118, 121, 132),
         "CHART_TICKS_SPINES": rgb_to_matlab(75, 77, 82),
-        "CHART_BG": rgb_to_matlab(30, 34, 45),
+        "CHART_BG": rgb_to_matlab(30, 34, 54),  # added a bit blueish
         "CHART_TEXT_COLOR": rgb_to_matlab(138, 141, 145),
         "CHART_TEXT_FONT": 'Segoe UI',  # not original one, but from inspect it is one that they use
-        "CHART_TEXT_FONT_SIZE": 10,
+        "CHART_TEXT_FONT_SIZE": 8,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(97, 98, 101),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(42, 46, 57),
         "BULL_CANDLE_BODY": rgb_to_matlab(38, 166, 154),
@@ -49,7 +51,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(255, 255, 255),
         "CHART_TEXT_COLOR": rgb_to_matlab(19, 23, 34),
         "CHART_TEXT_FONT": 'Trebuchet MS',
-        "CHART_TEXT_FONT_SIZE": 12,
+        "CHART_TEXT_FONT_SIZE": 10,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(149, 152, 161),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(243, 243, 243),
         "BULL_CANDLE_BODY": rgb_to_matlab(8, 153, 129),
@@ -64,7 +66,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(4, 4, 4),
         "CHART_TEXT_COLOR": rgb_to_matlab(255, 255, 255),
         "CHART_TEXT_FONT": 'Arial',
-        "CHART_TEXT_FONT_SIZE": 9,
+        "CHART_TEXT_FONT_SIZE": 7,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(120, 120, 120),  # there are no main separator in my setting
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(80, 80, 80),
         "BULL_CANDLE_BODY": rgb_to_matlab(53, 206, 53),
@@ -125,9 +127,11 @@ def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, 
     this function also applies the day splitting, or month splitting in the case of daily chart
     """
     chosen_splitter = None
-    for splitter_definition in MINUTELY_CHART_SPLITTERS:
-        if len(data) < splitter_definition[2]:
-            chosen_splitter = splitter_definition[:-1]
+    if "min" in timeframe:
+        for splitter_definition in MINUTELY_CHART_SPLITTERS:
+            if len(data) < splitter_definition[2]:
+                chosen_splitter = splitter_definition[:-1]
+                break
 
     if chosen_splitter is None:
         chosen_splitter = MINUTELY_CHART_SPLITTERS[-1][:-1]
@@ -144,6 +148,9 @@ def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, 
                 True if minutes_from_open % chosen_splitter[0] == 0 else False,  # very light and pale lines
                 True if minutes_from_open % chosen_splitter[1] == 0 else False,  # slightly more visible lines
             )
+            print(f"{chosen_splitter=}")
+            print(f"{minutes_from_open % chosen_splitter[0]}, {minutes_from_open % chosen_splitter[1]}")
+            print(dp, market_open_, minutes_from_open, drawing_informations, )
             graphical_splitters.append(drawing_informations)
     elif "day" in timeframe:
         for dp in data:
@@ -177,3 +184,84 @@ def resolve_timeframe_name(timeframe: str):
     else:
         raise ValueError("timeframe not suitable for this application")
     return digits + " " + full_name
+
+
+def get_time_series_labels(
+        time_splitting_spec: list[tuple[bool, bool, bool]], timestamps: list[datetime], timeframe: str):
+    """
+    grabs a time splitting specification obtained from other helper function, and based on it generates
+    series of labels to correctly
+    """
+    timestamp: datetime
+    if "min" in timeframe:
+        time_series_labels = []
+        skip_minor = False
+        skip_next = False
+        for put_timestamp, (index, timestamp) in zip(time_splitting_spec, enumerate(timestamps)):
+
+            if skip_next:
+                skip_next = False
+                if put_timestamp[1]:
+                    skip_minor = False
+                continue
+            if put_timestamp[0]:
+                if index <= len(timestamps) - 2:
+                    labels = ("", timestamps[index+1].strftime("%a"))
+                    time_series_labels.extend(labels)
+                else:
+                    label = ""
+                    time_series_labels.append(label)
+                    continue
+                skip_minor = True
+                skip_next = True
+                continue
+            else:
+                label = ""
+            if put_timestamp[1]:
+                if skip_minor:
+                    skip_minor = False
+                    label = ""
+                else:
+                    label = timestamp.strftime("%H:%M")  # print Hours:Minutes
+            time_series_labels.append(label)
+    elif "day" in timeframe:
+        time_series_labels = []
+        skip_minor = False
+        skip_next = False
+        for put_timestamp, (index, timestamp) in zip(time_splitting_spec, enumerate(timestamps)):
+            if skip_next:
+                skip_next = False
+                if put_timestamp[1]:
+                    skip_minor = False
+                continue
+            if put_timestamp[0]:
+                if index <= len(timestamps) - 2:
+                    # label = timestamps[index+1].strftime("%b")  # print short month signature
+                    labels = ("", timestamps[index+1].strftime("%b"))
+                    time_series_labels.extend(labels)
+                else:
+                    label = ""
+                    time_series_labels.append(label)
+                    continue
+                skip_minor = True
+                skip_next = True
+                continue
+            else:
+                label = ""
+            if put_timestamp[1]:
+                if skip_minor:
+                    skip_minor = False
+                    label = ""
+                else:
+                    label = f"{timestamp.day}"  # print short day number
+            time_series_labels.append(label)
+    else:
+        raise ValueError("timestamp not recognized")
+
+    for e in zip(time_splitting_spec, time_series_labels):
+        print(e)
+    return time_series_labels
+
+
+def get_price_labels(price_seires):
+    pass

@@ -12,7 +12,7 @@ from matplotlib.figure import Figure, SubFigure
 # from matplotlib.lines import Line2D
 from matplotlib.spines import Spine
 
-from vis_functions.vis_helpers import chart_split_lines, resolve_timeframe_name
+from vis_functions.vis_helpers import chart_split_lines, resolve_timeframe_name, get_time_series_labels
 from vis_functions.vis_helpers import AVAILABLE_THEMES, CHART_SETTINGS
 
 CHART_FILE_LOCATION = "\\".join(abspath(__file__).split("\\")[:-2] + ["charts"])
@@ -69,12 +69,12 @@ class PriceChart:
         elif isinstance(data[0], dict):
             # data downloaded
             # convert timestamps into datetime objects
-            if timeframe_ in ['1day']:
+            if self.timeframe in ['1day']:
                 time_conversion = '%Y-%m-%d'
-            elif timeframe_ in ['1min']:
+            elif self.timeframe in ['1min']:
                 time_conversion = '%Y-%m-%d %H:%M:%S'
             else:
-                raise ValueError(timeframe_)
+                raise ValueError(self.timeframe)
             self._series_timestamps = [datetime.strptime(d["datetime"], time_conversion) for d in data]
             self._series_opens = [d["open"] for d in data]
             self._series_closes = [d["close"] for d in data]
@@ -97,7 +97,6 @@ class PriceChart:
         self.main_chart: Axes = figure.get_axes()[0]
         timeframe = resolve_timeframe_name(self.timeframe)
         self.title = f"{self.symbol}_{self.market_code}" if self.is_stock else f"{self.symbol}"
-        self.main_chart.plot([1, 2, 3, 4])  # for font testing only
         self.title += ", " + f"{timeframe}"
         self.main_chart.spines: dict[str, Spine]  # noqa
         for e, spine in self.main_chart.spines.items():
@@ -134,15 +133,37 @@ class PriceChart:
 
         return figure
 
-    def draw_simple_chart(self, series: SERIES_DEFINER | None = None):
+    def draw_simple_chart(self, which_series: SERIES_DEFINER | None = None):
+        line_splitting_spec = chart_split_lines(self._series_timestamps, self.timeframe)
+        Y_labels = get_time_series_labels(line_splitting_spec, self._series_timestamps, self.timeframe)
+        X = [*range(len(self._series_timestamps))]
+        if which_series:
+            Y = getattr(self, f"_series_{which_series}s")
+        else:
+            Y = getattr(self, f"_series_{self.chart_type.split('_')[0]}s")
+        self.main_chart.plot(
+            X, Y, linewidth=0.7,
+            color=CHART_SETTINGS[self.color_theme]['CHART_MAIN_PLOT']
+        )
+        self.main_chart.set_xticks(X, labels=Y_labels)
+
+    def draw_candlestick_chart(self):
         pass
 
-    def save(self):
+    def save(self, name: str | None = None):
         if self.figure:
-            self.figure.savefig(CHART_FILE_LOCATION + "\\" + self.symbol, dpi=self.dpi)  # + "\\" + self.title
+            if name:
+                self.figure.savefig(CHART_FILE_LOCATION + "\\" + name + ".png", dpi=self.dpi)
+            else:
+                self.figure.savefig(CHART_FILE_LOCATION + "\\" + self.symbol, dpi=self.dpi)
 
-    def make_chart(self):
+    def make_chart(self, mode: str | None = None, chart_name: str | None = None):
         self.figure = self.prepare_chart_space()
+        if mode == "simple":
+            self.draw_simple_chart()
+        else:
+            self.draw_candlestick_chart()
+        self.save(name=chart_name)
 
 
 if __name__ == '__main__':
@@ -150,15 +171,22 @@ if __name__ == '__main__':
     from tests.t_helpers import generate_random_time_sample
 
     seed(2346346)
+    # very good seed accidentally -> test if 2 labels will overlap
+    # badly ("Fri" label with adjacent "19:00") -> for 80 daily and 400 1min
 
-    symbol, timeframe_, market_code, is_stock = "AAPL", "1min", "XNGS", True
-    series_1min = generate_random_time_sample("1min", is_equity=True, span=25)  # sample means single candles here
-    series_1day = generate_random_time_sample("1day", is_equity=True, span=25)
-    c = PriceChart(series_1min, symbol, timeframe_, market_code, is_stock, 1200, 1200,
-                   # color_theme="NINJATRADER_SLATE_DARK")
+    symbol, timeframe_, market_code, is_equity = "AAPL", "1min", "XNGS", True
+    series_1min = generate_random_time_sample("1min", is_equity=is_equity, span=400)
+    series_1day = generate_random_time_sample("1day", is_equity=is_equity, span=68)
+    c = PriceChart(series_1min, symbol, timeframe_, market_code, is_equity, 1920, 1080,
+                   color_theme="NINJATRADER_SLATE_DARK")
                    # color_theme="FREEDOM24_DARK_TEAL")
-                   color_theme="OSCILLOSCOPE_FROM_90s")
+                   # color_theme="OSCILLOSCOPE_FROM_90s")
+                   # color_theme="TRADINGVIEW_WHITE")
+    c2 = PriceChart(series_1day, symbol+"2", "1day", market_code, is_equity, 1920, 1080,
+                    # color_theme="NINJATRADER_SLATE_DARK")
+                    color_theme="FREEDOM24_DARK_TEAL")
+                    # color_theme="OSCILLOSCOPE_FROM_90s")
                    # color_theme="TRADINGVIEW_WHITE")
     # c = PriceChart()
     c.make_chart()
-    c.save()
+    c2.make_chart()
