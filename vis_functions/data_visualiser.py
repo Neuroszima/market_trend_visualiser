@@ -12,7 +12,7 @@ from matplotlib.figure import Figure, SubFigure
 # from matplotlib.lines import Line2D
 from matplotlib.spines import Spine
 
-from vis_functions.vis_helpers import chart_split_lines, resolve_timeframe_name, get_time_series_labels
+from vis_functions.vis_helpers import chart_time_split, resolve_timeframe_name, get_time_series_labels
 from vis_functions.vis_helpers import AVAILABLE_THEMES, CHART_SETTINGS
 
 CHART_FILE_LOCATION = "\\".join(abspath(__file__).split("\\")[:-2] + ["charts"])
@@ -46,13 +46,15 @@ class PriceChart:
         # chart
         self.size_x = size_x
         self.size_y = size_y
-        self.chart_splits = chart_split_lines(self._series_timestamps, self.timeframe)
+        self.chart_splits = chart_time_split(self._series_timestamps, self.timeframe, self.size_x / self.size_y)
         self.title: str | None = None
         self.figure: Figure | None = None
         self.main_chart: Axes | None = None
         self.dpi = dpi
         self.color_theme = "DARK_TEAL_FREEDOM24" if color_theme is None else color_theme
         self.chart_type = "simple_close" if chart_type is None else chart_type
+        self.main_font_size = CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"] * 250/self.dpi
+        self.labelsize = (CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"]-0.75) * 250/self.dpi
 
     def _disassemble(self, data: list[tuple | dict], is_stock: bool):
         """disassemble time series data into separate components for future reference"""
@@ -92,7 +94,6 @@ class PriceChart:
         )
         figure.subplots(
             nrows=1, ncols=1, subplot_kw={"facecolor": CHART_SETTINGS[self.color_theme]['CHART_BG']},
-            gridspec_kw={'wspace': 0.5, 'hspace': 0.245,}
         )
         self.main_chart: Axes = figure.get_axes()[0]
         timeframe = resolve_timeframe_name(self.timeframe)
@@ -105,11 +106,16 @@ class PriceChart:
                 spine.set_visible(False)
             spine.set(color=CHART_SETTINGS[self.color_theme]["CHART_SMALL_SEPARATORS"])
 
+        if len(self._series_timestamps) > 100:
+            time_ticks_visible = False
+        else:
+            time_ticks_visible = True
+
         self.main_chart.set_title(
             self.title, loc="left", fontstyle='normal', fontweight='normal', fontvariant='small-caps',
             color=CHART_SETTINGS[self.color_theme]["CHART_TEXT_COLOR"],
             fontfamily=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT"],
-            fontsize=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"],
+            fontsize=self.main_font_size,
             fontstretch='ultra-condensed')
 
         self.main_chart.yaxis: Axis  # noqa
@@ -117,30 +123,31 @@ class PriceChart:
             which="major", left=False, right=True, direction="in",
             color=CHART_SETTINGS[self.color_theme]["CHART_MAIN_SEPARATORS"],
             labelcolor=CHART_SETTINGS[self.color_theme]["CHART_TEXT_COLOR"],
+            labelsize=self.labelsize,
             labelfontfamily=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT"],
-            labelsize=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"],
             labelleft=False, labelright=True,
         )
 
         self.main_chart.xaxis: Axis  # noqa
         self.main_chart.xaxis.set_tick_params(
-            which="major", direction="in",
+            which="major", direction="in", bottom=time_ticks_visible,
             color=CHART_SETTINGS[self.color_theme]["CHART_MAIN_SEPARATORS"],
             labelcolor=CHART_SETTINGS[self.color_theme]["CHART_TEXT_COLOR"],
-            labelsize=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT_SIZE"],
+            labelsize=self.labelsize,
             labelfontfamily=CHART_SETTINGS[self.color_theme]["CHART_TEXT_FONT"],
         )
 
         return figure
 
     def draw_simple_chart(self, which_series: SERIES_DEFINER | None = None):
-        line_splitting_spec = chart_split_lines(self._series_timestamps, self.timeframe)
+        print('simple')
+        line_splitting_spec = chart_time_split(self._series_timestamps, self.timeframe, self.size_x / self.size_y)
         Y_labels = get_time_series_labels(line_splitting_spec, self._series_timestamps, self.timeframe)
         X = [*range(len(self._series_timestamps))]
         if which_series:
             Y = getattr(self, f"_series_{which_series}s")
         else:
-            Y = getattr(self, f"_series_{self.chart_type.split('_')[0]}s")
+            Y = getattr(self, f"_series_{self.chart_type.split('_')[1]}s")
         self.main_chart.plot(
             X, Y, linewidth=0.7,
             color=CHART_SETTINGS[self.color_theme]['CHART_MAIN_PLOT']
@@ -162,7 +169,11 @@ class PriceChart:
         if mode == "simple":
             self.draw_simple_chart()
         else:
-            self.draw_candlestick_chart()
+            if "simple" in self.chart_type:
+                self.draw_simple_chart()
+            else:
+                self.draw_candlestick_chart()
+        # plt.show()
         self.save(name=chart_name)
 
 
@@ -173,16 +184,18 @@ if __name__ == '__main__':
     seed(2346346)
     # very good seed accidentally -> test if 2 labels will overlap
     # badly ("Fri" label with adjacent "19:00") -> for 80 daily and 400 1min
+    aspect_1 = (1920, 1080)
+    aspect_2 = (1200, 1200)
 
     symbol, timeframe_, market_code, is_equity = "AAPL", "1min", "XNGS", True
-    series_1min = generate_random_time_sample("1min", is_equity=is_equity, span=400)
-    series_1day = generate_random_time_sample("1day", is_equity=is_equity, span=68)
-    c = PriceChart(series_1min, symbol, timeframe_, market_code, is_equity, 1920, 1080,
+    series_1min = generate_random_time_sample("1min", is_equity=is_equity, span=400)  # 400
+    series_1day = generate_random_time_sample("1day", is_equity=is_equity, span=68)  # 68
+    c = PriceChart(series_1min, symbol, "1min", market_code, is_equity, *aspect_2, dpi=300,
                    color_theme="NINJATRADER_SLATE_DARK")
                    # color_theme="FREEDOM24_DARK_TEAL")
                    # color_theme="OSCILLOSCOPE_FROM_90s")
                    # color_theme="TRADINGVIEW_WHITE")
-    c2 = PriceChart(series_1day, symbol+"2", "1day", market_code, is_equity, 1920, 1080,
+    c2 = PriceChart(series_1day, symbol+"2", "1day", market_code, is_equity, *aspect_2, dpi=300,
                     # color_theme="NINJATRADER_SLATE_DARK")
                     color_theme="FREEDOM24_DARK_TEAL")
                     # color_theme="OSCILLOSCOPE_FROM_90s")

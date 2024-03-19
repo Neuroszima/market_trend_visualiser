@@ -1,12 +1,19 @@
 from datetime import datetime
 from typing import Literal, Optional
+# from
 
 MINUTELY_CHART_SPLITTERS = [
     *[(5*i, 15*i, 40*i) for i in range(1, 15)], (120, 360, 720), (180, 1080, 3240)]
-print(MINUTELY_CHART_SPLITTERS)
-DAILY_CHART_SPLITTERS = 1  # what day will have a timestamp shown in chart
+DAY_LABEL_DRAW_EXCLUSION = [
+    (i, 10 + sum([15 + 4*j for j in range(i)])) for i in range(9)]  # what day will have a timestamp shown in chart
+MONTH_LABEL_DRAW_EXCLUSION = [
+    (i, 20 + sum([10 + 3*j for j in range(i)])) for i in range(9)]
 AVAILABLE_THEMES = Optional[Literal[
     "OSCILLOSCOPE_FROM_90s", "FREEDOM24_DARK_TEAL", "TRADINGVIEW_WHITE", "NINJATRADER_SLATE_DARK"]]
+
+print(MINUTELY_CHART_SPLITTERS)
+print(DAY_LABEL_DRAW_EXCLUSION)
+print(MONTH_LABEL_DRAW_EXCLUSION)
 
 
 def rgb_to_matlab(r, g, b) -> list | tuple:
@@ -77,52 +84,100 @@ CHART_SETTINGS = {
 }
 
 
-def split_chart_daily(data: list[datetime], timeframe: str) -> list[bool]:
+def exclusion_zone_marker(exclusion_list: list[bool], penalty, major_index):
+    for index in range(major_index-penalty, major_index+penalty+1):
+        try:
+            exclusion_list[index] = True
+        except IndexError:
+            pass
+    return exclusion_list
+
+
+def major_split_chart(
+        data: list[datetime], timeframe: str, chart_graphical_aspect_ratio: float) -> list[tuple[bool, bool]]:
     """
     Denote where to put a heavier line on every new market daily open in case of minutely chart, or on every new month
     in the case of daily candles, on forex chart, just denote a beginning of a new day or month.
 
     This is actually equivalent in data timestamps for both, but for stocks day happens to be a new market
     open in the morning, while forex has 24h cycle of trading.
+
+    the list of tuples that come out of this function marks following:
+        [(place_big_divider, prevent_small_label_drawing)]
+    for each of the timestamps that will form respective labels in the chart
     """
+
+    # decide which param of the timestamp to use to evaluate chart timeline labeling, and select proper
+    # penalty, against which smaller labels are prevented drawing, based on the distance away from main label
+    # ("day" is main label in minute chart, "month" is main label in daily chart,
+    # ("hours" - smaller timestamp in case of minute chart, while int("day") for daily chart, respectively)
+    penalty = None
     if "day" in timeframe:
         param = "month"
+        for p_tuple in MONTH_LABEL_DRAW_EXCLUSION:
+            if len(data) < p_tuple[1]:
+                penalty = p_tuple[0]
+                break
+        if not penalty:
+            penalty = MONTH_LABEL_DRAW_EXCLUSION[-1][-0]
     elif "h" in timeframe or "min" in timeframe:
         param = "day"
+        for p_tuple in DAY_LABEL_DRAW_EXCLUSION:
+            if len(data) < p_tuple[1]:
+                penalty = p_tuple[0]
+                break
+        if not penalty:
+            penalty = DAY_LABEL_DRAW_EXCLUSION[-1][-0]
     else:
-        return [False for _ in range(len(data))]
+        # not found the timeframe, but return with no error -> no major labels
+        return [(False, False) for _ in range(len(data))]
+
+    # chart can get a bit dense when aspect ratio is not widescreen or 16:9, so we add a bit of
+    # penalty to exclue farther
+    if chart_graphical_aspect_ratio < 1.5: penalty += 1
+
+    # too small data
     if len(data) == 1:
-        return [False]
+        return [(False, False)]
+
+    # main loop of marking special chart labels
     marked_data = []
+    small_label_exclusion_zone = [False for _ in range(len(data))]
     for i, timestamp in enumerate(data):
+
         if i == 0:
             if getattr(timestamp, param) != getattr(data[i+1], param):
                 marked_data.append(False)
                 marked_data.append(True)  # unfortunate case
+                small_label_exclusion_zone = exclusion_zone_marker(small_label_exclusion_zone, penalty, i+1)
             else:
                 marked_data.append(True)  # put a darker line prior to any candle/point on a chart
                 marked_data.append(False)
+                small_label_exclusion_zone = exclusion_zone_marker(small_label_exclusion_zone, penalty, i)
             continue
         if i == 1: continue
+
         try:
-            if getattr(timestamp, param) != getattr(data[i+1], param):
+            if getattr(timestamp, param) != getattr(data[i-1], param):
                 marked_data.append(True)
+                small_label_exclusion_zone = exclusion_zone_marker(small_label_exclusion_zone, penalty, i)
             else:
                 marked_data.append(False)
         except IndexError:
             marked_data.append(False)
-    return marked_data
+
+    markers = [
+        (major_label, minor_label_exclusion) for major_label, minor_label_exclusion
+        in zip(marked_data, small_label_exclusion_zone)
+    ]
+    return markers
 
 
-def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, bool, bool]]:
+def chart_time_split(
+        data: list[datetime], timeframe: str, chart_graphical_aspect_ratio: float
+        ) -> list[tuple[bool, bool]]:
     """
-    select periods of datapoints at which there should be visible divisor line drawn on the chart
-
-    the second period is bigger, and denotes more "thick" line that should be drawn, for visual
-    representation purposes and readability
-
-    the "periodic line" will be drawn, if "minutes" from datetime will be exactly "modulo 0" over the chosen
-    splitter period
+    select periods of datapoints at which there should be visible label drawn on the chart
 
     this function also applies the day splitting, or month splitting in the case of daily chart
     """
@@ -136,39 +191,39 @@ def chart_split_lines(data: list[datetime], timeframe: str) -> list[tuple[bool, 
     if chosen_splitter is None:
         chosen_splitter = MINUTELY_CHART_SPLITTERS[-1][:-1]
 
-    major_time_splits = split_chart_daily(data, timeframe)
+    major_time_splits = major_split_chart(data, timeframe, chart_graphical_aspect_ratio)
 
-    graphical_splitters: list[tuple[bool, bool]] = []
+    graphical_splitters: list[bool] = []
     if "min" in timeframe:
-        for dp in data:
+        for dp, major_split in zip(data, major_time_splits):
             market_open_ = datetime(year=dp.year, month=dp.month, day=dp.day, minute=30, hour=13)
             # in terms of real market data, following will get negative for forex, but it won't really matter i think
             minutes_from_open = abs((market_open_ - dp).total_seconds()) // 60
-            drawing_informations = (
-                True if minutes_from_open % chosen_splitter[0] == 0 else False,  # very light and pale lines
-                True if minutes_from_open % chosen_splitter[1] == 0 else False,  # slightly more visible lines
-            )
-            print(f"{chosen_splitter=}")
-            print(f"{minutes_from_open % chosen_splitter[0]}, {minutes_from_open % chosen_splitter[1]}")
-            print(dp, market_open_, minutes_from_open, drawing_informations, )
-            graphical_splitters.append(drawing_informations)
+            # decide if there is need to put minor
+            if (minutes_from_open % chosen_splitter[0] == 0) and (not major_split[1]):
+                graphical_splitters.append(True)
+            else:
+                graphical_splitters.append(False)
+
     elif "day" in timeframe:
-        for dp in data:
-            drawing_info = (
-                True if dp.isoweekday() == 1 else False,  # split weeks on mondays -> slightly more visible line
-                False  # no thicker lines really
-            )
-            graphical_splitters.append(drawing_info)
+        for dp, major_split in zip(data, major_time_splits):
+            # decide if there is need to put minor
+            # split weeks on mondays
+            if (dp.isoweekday() == 1) and (not major_split[1]):
+                graphical_splitters.append(True)
+            else:
+                graphical_splitters.append(False)
+
     else:
         raise ValueError("timeframe not supported")
 
-    graphical_splitters: list[tuple[bool, bool, bool]] = [
-        (bigger_splitter, small_splitters[0], small_splitters[1])
-        for bigger_splitter, small_splitters
+    label_list: list[tuple[bool, bool]] = [
+        (major_labels[0], small_label)
+        for major_labels, small_label
         in zip(major_time_splits, graphical_splitters)
     ]
 
-    return graphical_splitters
+    return label_list
 
 
 def resolve_timeframe_name(timeframe: str):
@@ -187,7 +242,7 @@ def resolve_timeframe_name(timeframe: str):
 
 
 def get_time_series_labels(
-        time_splitting_spec: list[tuple[bool, bool, bool]], timestamps: list[datetime], timeframe: str):
+        time_splitting_spec: list[tuple[bool, bool]], timestamps: list[datetime], timeframe: str):
     """
     grabs a time splitting specification obtained from other helper function, and based on it generates
     series of labels to correctly
@@ -195,66 +250,26 @@ def get_time_series_labels(
     timestamp: datetime
     if "min" in timeframe:
         time_series_labels = []
-        skip_minor = False
-        skip_next = False
-        for put_timestamp, (index, timestamp) in zip(time_splitting_spec, enumerate(timestamps)):
-
-            if skip_next:
-                skip_next = False
-                if put_timestamp[1]:
-                    skip_minor = False
-                continue
-            if put_timestamp[0]:
-                if index <= len(timestamps) - 2:
-                    labels = ("", timestamps[index+1].strftime("%a"))
-                    time_series_labels.extend(labels)
-                else:
-                    label = ""
-                    time_series_labels.append(label)
-                    continue
-                skip_minor = True
-                skip_next = True
-                continue
+        for (major_label, minor_label), (index, timestamp) in zip(time_splitting_spec, enumerate(timestamps)):
+            if major_label:
+                label = timestamp.strftime("%a")  # print day
+            elif minor_label:
+                label = timestamp.strftime("%H:%M")  # print hour:minute
             else:
-                label = ""
-            if put_timestamp[1]:
-                if skip_minor:
-                    skip_minor = False
-                    label = ""
-                else:
-                    label = timestamp.strftime("%H:%M")  # print Hours:Minutes
+                label = ""  # leave empty
             time_series_labels.append(label)
+
     elif "day" in timeframe:
         time_series_labels = []
-        skip_minor = False
-        skip_next = False
-        for put_timestamp, (index, timestamp) in zip(time_splitting_spec, enumerate(timestamps)):
-            if skip_next:
-                skip_next = False
-                if put_timestamp[1]:
-                    skip_minor = False
-                continue
-            if put_timestamp[0]:
-                if index <= len(timestamps) - 2:
-                    # label = timestamps[index+1].strftime("%b")  # print short month signature
-                    labels = ("", timestamps[index+1].strftime("%b"))
-                    time_series_labels.extend(labels)
-                else:
-                    label = ""
-                    time_series_labels.append(label)
-                    continue
-                skip_minor = True
-                skip_next = True
-                continue
+        for (major_label, minor_label), (index, timestamp) in zip(time_splitting_spec, enumerate(timestamps)):
+            if major_label:
+                label = timestamp.strftime("%b")  # print short_month
+            elif minor_label:
+                label = f"{timestamp.day}"  # print int("day")
             else:
-                label = ""
-            if put_timestamp[1]:
-                if skip_minor:
-                    skip_minor = False
-                    label = ""
-                else:
-                    label = f"{timestamp.day}"  # print short day number
+                label = ""  # leave empty
             time_series_labels.append(label)
+
     else:
         raise ValueError("timestamp not recognized")
 
