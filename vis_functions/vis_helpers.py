@@ -37,6 +37,7 @@ CHART_SETTINGS = {
         "BEAR_CANDLE_BODY": rgb_to_matlab(3, 9, 3),
         "CANDLE_BORDER": rgb_to_matlab(4, 222, 14),
         "VOLUME_BAR_BODY": rgb_to_matlab(4, 120, 14),
+        "WICK_COLOR": rgb_to_matlab(4, 222, 14),
     },
     "FREEDOM24_DARK_TEAL": {
         "CHART_MAIN_PLOT": rgb_to_matlab(118, 121, 132),
@@ -50,7 +51,8 @@ CHART_SETTINGS = {
         "BULL_CANDLE_BODY": rgb_to_matlab(38, 166, 154),
         "BEAR_CANDLE_BODY": rgb_to_matlab(239, 83, 80),
         "CANDLE_BORDER": None,  # candle border is the same color as the candle
-        "VOLUME_BAR_BODY": rgb_to_matlab(30, 48, 90),  # a bit modified
+        "VOLUME_BAR_BODY": rgb_to_matlab(34, 55, 98),  # a bit modified
+        "WICK_COLOR": rgb_to_matlab(118, 121, 132),
     },
     "TRADINGVIEW_WHITE": {
         "CHART_MAIN_PLOT": rgb_to_matlab(68, 138, 255),
@@ -64,8 +66,9 @@ CHART_SETTINGS = {
         "BULL_CANDLE_BODY": rgb_to_matlab(8, 153, 129),
         "BEAR_CANDLE_BODY": rgb_to_matlab(242, 54, 69),
         "CANDLE_BORDER": None,   # like above
-        "VOLUME_BAR_BODY": "+50%",  # about 50% brighter -> +50% of the diff from 255 to main
-    # volume candles are also transparent
+        "VOLUME_BAR_BODY": 0.5,  # about 50% brighter -> +50% of the diff from 255 to main
+        # volume candles are also transparent
+        "WICK_COLOR": None,
     },
     "NINJATRADER_SLATE_DARK": {
         "CHART_MAIN_PLOT": rgb_to_matlab(255, 255, 255),
@@ -80,11 +83,13 @@ CHART_SETTINGS = {
         "BEAR_CANDLE_BODY": rgb_to_matlab(68, 107, 255),
         "CANDLE_BORDER": rgb_to_matlab(255, 255, 255),
         "VOLUME_BAR_BODY": rgb_to_matlab(34, 146, 255),
+        "WICK_COLOR": rgb_to_matlab(255, 255, 255),
     },
 }
 
 
 def exclusion_zone_marker(exclusion_list: list[bool], penalty, major_index):
+    print(f"excluding from {major_index-penalty} to {major_index + penalty}")
     for index in range(major_index-penalty, major_index+penalty+1):
         try:
             exclusion_list[index] = True
@@ -119,7 +124,7 @@ def major_split_chart(
                 penalty = p_tuple[0]
                 break
         if not penalty:
-            penalty = MONTH_LABEL_DRAW_EXCLUSION[-1][-0]
+            penalty = MONTH_LABEL_DRAW_EXCLUSION[-1][0]
     elif "h" in timeframe or "min" in timeframe:
         param = "day"
         for p_tuple in DAY_LABEL_DRAW_EXCLUSION:
@@ -127,7 +132,7 @@ def major_split_chart(
                 penalty = p_tuple[0]
                 break
         if not penalty:
-            penalty = DAY_LABEL_DRAW_EXCLUSION[-1][-0]
+            penalty = DAY_LABEL_DRAW_EXCLUSION[-1][0]
     else:
         # not found the timeframe, but return with no error -> no major labels
         return [(False, False) for _ in range(len(data))]
@@ -179,7 +184,7 @@ def chart_time_split(
     """
     select periods of datapoints at which there should be visible label drawn on the chart
 
-    this function also applies the day splitting, or month splitting in the case of daily chart
+    this function also applies the day splitting in case of minute chart, or month splitting in the case of daily chart
     """
     chosen_splitter = None
     if "min" in timeframe:
@@ -273,10 +278,43 @@ def get_time_series_labels(
     else:
         raise ValueError("timestamp not recognized")
 
-    for e in zip(time_splitting_spec, time_series_labels):
-        print(e)
     return time_series_labels
 
 
-def get_price_labels(price_seires):
-    pass
+def define_bars_colors(open_series, close_series, color_factor=None, bull_bar_color=None, bear_bar_color=None):
+    """
+    create a series of colors that should be applied in a bar-by-bar fashion to the volume bar series
+    the "color factor" applies a brightening effect (increases the saturation
+
+    series of opens and closes will be used to determine if bar is bearish or bullish
+    """
+    if color_factor:
+        if -1 >= color_factor >= 1:
+            raise ValueError("color factor has to be ")
+    colors = []
+    # apply brightening effect by increase
+    if bear_bar_color:
+        if color_factor > 0:
+            new_color = [c + (1 - c)*color_factor for c in bear_bar_color]
+        else:
+            new_color = [c * (1 + color_factor) for c in bear_bar_color]
+        bear_bar_color = tuple(new_color)
+    if bull_bar_color:
+        if color_factor > 0:
+            new_color = [c + (1 - c)*color_factor for c in bull_bar_color]
+        else:
+            new_color = [c * (1 + color_factor) for c in bull_bar_color]
+        bull_bar_color = tuple(new_color)
+
+    bull_bar_color = bull_bar_color if bull_bar_color else (0, 1, 0)
+    bear_bar_color = bear_bar_color if bear_bar_color else (1, 0, 0)
+
+    for open_, close_ in zip(open_series, close_series):
+        if open_ < close_:
+            colors.append(bull_bar_color)
+        elif open_ > close_:
+            colors.append(bear_bar_color)
+        else:
+            colors.append(None)
+
+    return colors
