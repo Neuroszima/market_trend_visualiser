@@ -1,6 +1,9 @@
 from datetime import datetime
 from typing import Literal, Optional
-# from
+
+from matplotlib.lines import Line2D
+from matplotlib.text import Text
+
 
 MINUTELY_CHART_SPLITTERS = [
     *[(5*i, 15*i, 40*i) for i in range(1, 15)], (120, 360, 720), (180, 1080, 3240)]
@@ -10,10 +13,6 @@ MONTH_LABEL_DRAW_EXCLUSION = [
     (i, 20 + sum([10 + 3*j for j in range(i)])) for i in range(9)]
 AVAILABLE_THEMES = Optional[Literal[
     "OSCILLOSCOPE_FROM_90s", "FREEDOM24_DARK_TEAL", "TRADINGVIEW_WHITE", "NINJATRADER_SLATE_DARK"]]
-
-print(MINUTELY_CHART_SPLITTERS)
-print(DAY_LABEL_DRAW_EXCLUSION)
-print(MONTH_LABEL_DRAW_EXCLUSION)
 
 
 def rgb_to_matlab(r, g, b) -> list | tuple:
@@ -30,7 +29,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(3, 9, 3),
         "CHART_TEXT_COLOR": rgb_to_matlab(4, 232, 14),
         "CHART_TEXT_FONT": 'monospace',
-        "CHART_TEXT_FONT_SIZE": 9,
+        "CHART_TEXT_FONT_SIZE": 7.6,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(5, 177, 17),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(4, 113, 12),
         "BULL_CANDLE_BODY": rgb_to_matlab(4, 222, 14),
@@ -45,7 +44,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(30, 34, 54),  # added a bit blueish
         "CHART_TEXT_COLOR": rgb_to_matlab(138, 141, 145),
         "CHART_TEXT_FONT": 'Segoe UI',  # not original one, but from inspect it is one that they use
-        "CHART_TEXT_FONT_SIZE": 8,
+        "CHART_TEXT_FONT_SIZE": 7.4,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(97, 98, 101),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(42, 46, 57),
         "BULL_CANDLE_BODY": rgb_to_matlab(38, 166, 154),
@@ -60,7 +59,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(255, 255, 255),
         "CHART_TEXT_COLOR": rgb_to_matlab(19, 23, 34),
         "CHART_TEXT_FONT": 'Trebuchet MS',
-        "CHART_TEXT_FONT_SIZE": 10,
+        "CHART_TEXT_FONT_SIZE": 8,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(149, 152, 161),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(243, 243, 243),
         "BULL_CANDLE_BODY": rgb_to_matlab(8, 153, 129),
@@ -76,7 +75,7 @@ CHART_SETTINGS = {
         "CHART_BG": rgb_to_matlab(4, 4, 4),
         "CHART_TEXT_COLOR": rgb_to_matlab(255, 255, 255),
         "CHART_TEXT_FONT": 'Arial',
-        "CHART_TEXT_FONT_SIZE": 7,
+        "CHART_TEXT_FONT_SIZE": 6.7,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab(120, 120, 120),  # there are no main separator in my setting
         "CHART_SMALL_SEPARATORS": rgb_to_matlab(80, 80, 80),
         "BULL_CANDLE_BODY": rgb_to_matlab(53, 206, 53),
@@ -89,7 +88,6 @@ CHART_SETTINGS = {
 
 
 def exclusion_zone_marker(exclusion_list: list[bool], penalty, major_index):
-    print(f"excluding from {major_index-penalty} to {major_index + penalty}")
     for index in range(major_index-penalty, major_index+penalty+1):
         try:
             exclusion_list[index] = True
@@ -99,7 +97,7 @@ def exclusion_zone_marker(exclusion_list: list[bool], penalty, major_index):
 
 
 def major_split_chart(
-        data: list[datetime], timeframe: str, chart_graphical_aspect_ratio: float) -> list[tuple[bool, bool]]:
+        data: list[datetime], timeframe: str, chart_aspect_ratio: float) -> list[tuple[bool, bool]]:
     """
     Denote where to put a heavier line on every new market daily open in case of minutely chart, or on every new month
     in the case of daily candles, on forex chart, just denote a beginning of a new day or month.
@@ -138,8 +136,8 @@ def major_split_chart(
         return [(False, False) for _ in range(len(data))]
 
     # chart can get a bit dense when aspect ratio is not widescreen or 16:9, so we add a bit of
-    # penalty to exclue farther
-    if chart_graphical_aspect_ratio < 1.5: penalty += 1
+    # penalty to exclude farther
+    if chart_aspect_ratio < 1.5: penalty += 1
 
     # too small data
     if len(data) == 1:
@@ -268,7 +266,10 @@ def get_time_series_labels(
         time_series_labels = []
         for (major_label, minor_label), (index, timestamp) in zip(time_splitting_spec, enumerate(timestamps)):
             if major_label:
-                label = timestamp.strftime("%b")  # print short_month
+                if timestamp.month == 1:
+                    label = timestamp.strftime("%Y")
+                else:
+                    label = timestamp.strftime("%b")  # print short_month
             elif minor_label:
                 label = f"{timestamp.day}"  # print int("day")
             else:
@@ -318,3 +319,75 @@ def define_bars_colors(open_series, close_series, color_factor=None, bull_bar_co
             colors.append(None)
 
     return colors
+
+
+def volume_labels_ticker(volume, _, max_arg: int | None = None):
+    """
+    reformat volume labels into much shorted ones, that fit in the chart space
+    unused param is "position"
+    """
+    if max_arg:
+        if max_arg > 2_000_000_000:
+            return f"{volume//(10**9):.1f}B"
+        elif max_arg > 2_000_000:
+            return f"{volume//(10**6):.1f}M"
+        elif max_arg > 2000:
+            return f"{volume//1000:.1f}k"
+        else:
+            return f"{volume}"
+    else:
+        if volume > 3_000_000_000:
+            return f"{volume // (10**9):.1f}B"
+        elif volume > 3_000_000:
+            return f"{volume // (10 ** 6):.1f}M"
+        elif volume > 4000:
+            return f"{volume // 1000:.1f}k"
+        else:
+            return f"{volume}"
+
+
+def draw_end_price_label(
+        last_price_close, last_bar_open, end_index, chart_bound, label_size,
+        color_theme: AVAILABLE_THEMES, is_equity: bool):
+
+    labels_text_ = f"{last_price_close:.2f}" if is_equity else f"{last_price_close:.5f}"
+
+    if color_theme in ["FREEDOM24_DARK_TEAL", "TRADINGVIEW_WHITE"]:
+        # derive BG color from last bar
+        if last_bar_open > last_price_close:
+            last_bar_color = CHART_SETTINGS[color_theme]["BEAR_CANDLE_BODY"]
+        elif last_price_close > last_bar_open:
+            last_bar_color = CHART_SETTINGS[color_theme]["BULL_CANDLE_BODY"]
+        else:
+            last_bar_color = CHART_SETTINGS[color_theme]["CHART_MAIN_PLOT"]
+        bbox = {
+            "boxstyle": "square",
+            "facecolor": last_bar_color,
+            "edgecolor": last_bar_color,
+            "linewidth": 0
+        }
+        text_color = 1., 1., 1.
+        connector_color = last_bar_color
+    else:
+        bbox = {
+            "boxstyle": "square",
+            "facecolor": CHART_SETTINGS[color_theme]["CHART_BG"],
+            "edgecolor": CHART_SETTINGS[color_theme]["CHART_MAIN_PLOT"],
+            "linewidth": 0.4
+        }
+        text_color = CHART_SETTINGS[color_theme]["CHART_TEXT_COLOR"]
+        connector_color = CHART_SETTINGS[color_theme]["CHART_MAIN_PLOT"]
+
+    last_price_label = Text(
+        x=0.996 * chart_bound, y=last_price_close, text=labels_text_, color=text_color,
+        verticalalignment="center", horizontalalignment="left", clip_on=False,
+        size=label_size + 0.3, bbox=bbox, fontstyle='normal', fontweight='normal',
+        fontvariant='small-caps', fontfamily=CHART_SETTINGS[color_theme]["CHART_TEXT_FONT"],
+        fontstretch='extra-expanded', zorder=5
+    )
+    connector = Line2D(
+        xdata=[end_index, chart_bound+0.5], ydata=[last_price_close, last_price_close],
+        color=connector_color, zorder=2, linewidth=0.4, clip_on=False
+    )
+
+    return connector, last_price_label
