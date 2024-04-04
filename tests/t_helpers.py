@@ -110,8 +110,8 @@ def generate_random_time_sample(
         candle = sorted([randint(4, 26) for _ in range(4)])
         if not bullish:
             candle[1], candle[2] = candle[2], candle[1]  # swap open with close
-        if is_equity:
-            candle.append(randint(100, 300))
+        if is_equity:  # attach volume traded to candle
+            candle.append(randint(100000, 300000))
         candles.append(candle)
     data = [
         {
