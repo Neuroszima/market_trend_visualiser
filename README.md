@@ -97,11 +97,11 @@ computer (for example a script that you can run through Windows/Linux scheduler)
 
 ## Examples of charts made with the package
 
-[AAPL retro chart](./image_examples/AAPL_square_90s.png)
+![AAPL retro chart](./image_examples/AAPL_square_90s.png)
 
-[UWMC freedom24 chart](./image_examples/UWMC_square_freedom.png)
+![UWMC freedom24 chart](./image_examples/UWMC_square_freedom.png)
 
-[NVDA tradingview chart](./image_examples/NVDA_square_tradingview.png)
+![NVDA tradingview chart](./image_examples/NVDA_square_tradingview.png)
 
 all examples reside in ```image_examples``` folder in this repository
 
