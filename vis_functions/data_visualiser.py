@@ -24,8 +24,8 @@ except ImportError:
 import vis_functions.vis_helpers as vis_helpers
 from vis_functions.vis_helpers import AVAILABLE_THEMES_, CHART_SETTINGS_
 
-CHART_FILE_LOCATION = "\\".join(abspath(__file__).split("\\")[:-2] + ["charts"])
-SERIES_DEFINER = Literal['close', 'open', 'volume', 'low', 'high']
+CHART_FILE_LOCATION_ = "\\".join(abspath(__file__).split("\\")[:-2] + ["charts"])
+_SERIES_DEFINER = Literal['close', 'open', 'volume', 'low', 'high']
 
 
 class PriceChart:
@@ -64,13 +64,14 @@ class PriceChart:
         self.main_chart: Axes | AxesBase = None
         self.volume_chart: Axes | AxesBase = None
         self.dpi = dpi
-        self.chart_timeline_bound = int(len(self._series_highs)*1.035)+1
+        self.chart_timeline_bound = int(len(self._series_highs)*1.032)+1
         self.color_theme = "DARK_TEAL_FREEDOM24" if color_theme is None else color_theme
         self.chart_type = "simple_close" if chart_type is None else chart_type
-        self.contour_width = max(0.40, (62 / len(data)) ** (1. / 3) * 0.64)
+        self.contour_width = max(0.26, (62 / len(data)) ** (1. / 3) * 0.43)
         self.candle_width = 0.55
         self.main_font_size = CHART_SETTINGS_[self.color_theme]["CHART_TEXT_FONT_SIZE"] * 250 / self.dpi
         self.labelsize: int | float | None = None
+        self.date_labelsize: int | float | None = None
         self.main_chart_title_offset = 0.002 * self.main_font_size
 
     def _disassemble(self, data: list[tuple | dict], is_stock: bool):
@@ -116,12 +117,13 @@ class PriceChart:
             max_number_len = len(str(floor(max(self._series_highs)))) + 3  # common price + ".XX" digits as "cents"
 
         if CHART_SETTINGS_[self.color_theme]["CHART_TEXT_FONT"] == "monospace":
-            label_factor = 1.1
+            label_factor = 1.05
         else:
             label_factor = 0.75
         l_size_start = (CHART_SETTINGS_[self.color_theme]["CHART_TEXT_FONT_SIZE"] - label_factor) * 250 / self.dpi
-        l_size_start = l_size_start * (4 / max(4, max_number_len))
-        self.labelsize = l_size_start
+        number_labels = min(l_size_start * (4 / max(4, max_number_len)) * 1.3, l_size_start)
+        self.date_labelsize = l_size_start
+        self.labelsize = number_labels
 
     def prepare_chart_space(self) -> Figure:
         if self._series_volumes:
@@ -129,7 +131,7 @@ class PriceChart:
         else:
             subfigure_height_ratios = [1, 0]  # no volume chart, subplot will have axis hidden
 
-        figure: Figure = plt.figure(
+        figure: Figure = Figure(
             figsize=(self.size_x / self.dpi, self.size_y / self.dpi),
             facecolor=CHART_SETTINGS_[self.color_theme]['CHART_BG'],
         )
@@ -184,7 +186,7 @@ class PriceChart:
                 which="major", direction="in", bottom=time_ticks_visible,
                 color=CHART_SETTINGS_[self.color_theme]["CHART_MAIN_SEPARATORS"],
                 labelcolor=CHART_SETTINGS_[self.color_theme]["CHART_TEXT_COLOR"],
-                labelsize=self.labelsize,
+                labelsize=self.date_labelsize,
                 labelfontfamily=CHART_SETTINGS_[self.color_theme]["CHART_TEXT_FONT"],
             )
 
@@ -201,14 +203,14 @@ class PriceChart:
 
     def prescale_main_chart(self):
         """apply a proper scaling to the chart so all "candle" actors start to become visible"""
-        flat_offset = (max(self._series_highs) - min(self._series_lows)) * 0.1
-        self.main_chart_bottom = min(self._series_lows) - 0.8*flat_offset
-        self.main_chart_top = max(self._series_highs) + 1.6*flat_offset
+        flat_offset = float(max(self._series_highs) - min(self._series_lows)) * 0.1
+        self.main_chart_bottom = float(min(self._series_lows)) - 0.8*flat_offset
+        self.main_chart_top = float(max(self._series_highs)) + 1.6*flat_offset
 
         self.main_chart.set_ylim(bottom=self.main_chart_bottom, top=self.main_chart_top)
         self.main_chart.set_xlim(left=-1, right=self.chart_timeline_bound)
 
-    def draw_simple_chart(self, X: list[int], which_series: SERIES_DEFINER | None = None):
+    def draw_simple_chart(self, X: list[int], which_series: _SERIES_DEFINER | None = None):
         """draw a single line showing price changes over time, usually in "candle close" format"""
         self.prescale_main_chart()
         if which_series:
@@ -226,6 +228,7 @@ class PriceChart:
                 self._series_opens, self._series_closes, self._series_lows, self._series_highs)):
 
             candle_height = close_ - open_  # DIRECTION MATTERS! no abs()
+            doji_candle_height = 0.003 * float(max(self._series_highs) - min(self._series_lows))
 
             # determine wick color and candle color -> if "wick = None" -> inherit candle color
             if candle_height > 0:
@@ -238,17 +241,22 @@ class PriceChart:
                 CHART_SETTINGS_[self.color_theme]["WICK_COLOR"] is not None else facecolor
 
             if open_ != close_:
+                # added this for very slim candles, so that they can be visible
+                if abs(candle_height) > abs(doji_candle_height):
+                    height = candle_height
+                else:
+                    height = doji_candle_height
                 candle_body = Rectangle(
-                    (i - self.candle_width / 2, open_), self.candle_width, candle_height,
+                    (i - self.candle_width / 2, float(open_)), self.candle_width, height=float(height),
                     facecolor=facecolor, edgecolor=CHART_SETTINGS_[self.color_theme]["CANDLE_BORDER"],
                     linewidth=self.contour_width, zorder=5
                 )
             else:  # doji candle
                 # set the "semi-static" height based on the span of the data, so that it will scale even
                 # when we change resolutions and data
-                candle_height = 0.003 * (max(self._series_highs) - min(self._series_lows))
                 candle_body = Rectangle(
-                    (i - self.candle_width / 2, open_ - candle_height / 2), self.candle_width, candle_height,
+                    (i - self.candle_width / 2, float(open_) - doji_candle_height / 2), self.candle_width,
+                    doji_candle_height,
                     color=facecolor, linewidth=self.contour_width, zorder=5
                 )
 
@@ -304,9 +312,10 @@ class PriceChart:
     def save(self, name: str | None = None):
         if self.figure:
             if name:
-                self.figure.savefig(CHART_FILE_LOCATION + "\\" + name + ".png", dpi=self.dpi)
+                self.figure.savefig(CHART_FILE_LOCATION_ + "\\" + name + ".png", dpi=self.dpi)
             else:
-                self.figure.savefig(CHART_FILE_LOCATION + "\\" + self.symbol, dpi=self.dpi)
+                self.figure.savefig(CHART_FILE_LOCATION_ + "\\" + self.symbol, dpi=self.dpi)
+            plt.close(self.figure)
 
     def make_chart(self, mode: str | None = None, chart_name: str | None = None):
         """complete procedure to make a chart space along with """

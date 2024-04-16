@@ -35,6 +35,8 @@ So far this has been solved in the ``api_key_switcher_()`` function buried insid
 however so far only free tier keys are covered by this function (meaning it will calculate delays that should be 
 applied to not trip the download mechanisms)
 
+Timestamps for each candle/close are UTC+00:00 normalized for downloads and testing
+
 
 ##### DB handler
 
@@ -75,12 +77,12 @@ key permission lists that prevent quick token depletion, on the other enabling b
 
 :heavy_check_mark: extend saving time series to forex data (additional schema and modification to download functions)
 
-:heavy_minus_sign: tests to check correctness of most if not all api and db related functions
+:heavy_check_mark: tests to check correctness of most if not all api and db related functions
 
-:heavy_minus_sign: prepare automatic creation script for creating a fresh database, which is initially 
+:heavy_check_mark: prepare automatic creation script for creating a fresh database, which is initially 
 populated with a couple preselected stocks (kind of like "demo mode")
 
-:heavy_minus_sign: prepare simple data visualizer for already downloaded timeseries 
+:heavy_check_mark: prepare simple data visualizer for already downloaded timeseries 
 (limited one - latest 90 days or latest 90 minutes)
 
 :heavy_minus_sign: prepare a visual tool (very basic, for example in T-kinter) to mark which tickers have to be 

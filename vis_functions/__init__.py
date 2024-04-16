@@ -5,6 +5,7 @@ import vis_functions.vis_helpers as vis_helpers
 
 
 PriceChart: type = data_visualizer.PriceChart
+CHART_FILE_LOCATION: str = data_visualizer.CHART_FILE_LOCATION_
 
 rgb_to_matlab: Callable = vis_helpers.rgb_to_matlab_
 AVAILABLE_THEMES = vis_helpers.AVAILABLE_THEMES_

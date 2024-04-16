@@ -29,7 +29,7 @@ CHART_SETTINGS_ = {
         "CHART_BG": rgb_to_matlab_(3, 9, 3),
         "CHART_TEXT_COLOR": rgb_to_matlab_(4, 232, 14),
         "CHART_TEXT_FONT": 'monospace',
-        "CHART_TEXT_FONT_SIZE": 7.6,
+        "CHART_TEXT_FONT_SIZE": 7.4,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab_(5, 177, 17),
         "CHART_SMALL_SEPARATORS": rgb_to_matlab_(4, 113, 12),
         "BULL_CANDLE_BODY": rgb_to_matlab_(4, 222, 14),
@@ -75,7 +75,7 @@ CHART_SETTINGS_ = {
         "CHART_BG": rgb_to_matlab_(4, 4, 4),
         "CHART_TEXT_COLOR": rgb_to_matlab_(255, 255, 255),
         "CHART_TEXT_FONT": 'Arial',
-        "CHART_TEXT_FONT_SIZE": 6.7,
+        "CHART_TEXT_FONT_SIZE": 7.1,
         "CHART_MAIN_SEPARATORS": rgb_to_matlab_(120, 120, 120),  # there are no main separator in my setting
         "CHART_SMALL_SEPARATORS": rgb_to_matlab_(80, 80, 80),
         "BULL_CANDLE_BODY": rgb_to_matlab_(53, 206, 53),
@@ -137,7 +137,7 @@ def _major_split_chart(
 
     # chart can get a bit dense when aspect ratio is not widescreen or 16:9, so we add a bit of
     # penalty to exclude farther
-    if chart_aspect_ratio < 1.5: penalty += 1
+    # if chart_aspect_ratio < 1.5: penalty += 1
 
     # too small data
     if len(data) == 1:

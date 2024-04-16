@@ -29,6 +29,9 @@ class ProcedureTests(unittest.TestCase):
             ("USD/GBP", None, "1min", False),  # v
         ]
 
+    def tearDown(self) -> None:
+        db_functions.purge_db_structure()
+
     def assertTableExist(self, table_name, schema_name):
         with psycopg2.connect(**helpers._connection_dict) as conn:
             cur = conn.cursor()

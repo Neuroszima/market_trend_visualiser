@@ -25,10 +25,10 @@ def parse_get_response_(
     # response = requests.get(url=EARLIEST_TIMESTAMP, params=querystring, headers=headers)
     match request_type:
         case "earliest_timestamp":
-            querystring_parameters['timezone'] = "Europe/London"
+            querystring_parameters['timezone'] = "UTC"
             endpoint = EARLIEST_TIMESTAMP_URL
         case "time_series":
-            querystring_parameters['timezone'] = "Europe/London"
+            querystring_parameters['timezone'] = "UTC"
             endpoint = TIME_SERIES_URL
         case "list indices":
             endpoint = LIST_OF_AVAILABLE_INDICES
@@ -67,13 +67,13 @@ def parse_get_response_(
         case "json":
             result: dict = response.json()
             if result.get('code') == 404:
-                raise ConnectionError('Error with query:', result['message'])
+                raise ConnectionError(404, "Error with query: " + result['message'])
         case "csv":
             result: str = response.text
             with suppress(ValueError):
                 r_ = json.loads(result)
                 if r_['code'] == 404:
-                    raise ConnectionError('Error with query:', r_['message'])
+                    raise ConnectionError(404, "Error with query: " + r_['message'])
         case __:
             raise KeyError("data type must be either \'csv\' or \'json\'")
 

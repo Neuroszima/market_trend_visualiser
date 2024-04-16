@@ -129,7 +129,7 @@ def download_time_series_(symbol: str, api_key_pair: tuple, exchange=None, mic_c
         querystring['date'] = date.strftime('%Y-%m-%d %H:%M:%S')
     if points:
         querystring['outputsize'] = points
-    # following is less precise than passing the MIC of the exchange, use with care
+    # following is less precise than passing the MIC of the exchange the instrument is traded in, use with care
     if exchange:
         querystring['exchange'] = exchange
 
@@ -229,16 +229,7 @@ def download_market_ticker_history_(
         time_interval = "1min"
 
     ask_equity = "/" not in symbol
-    if ask_equity:  # asking for equity information, otherwise asking for forex pair
-        if not mic_code:
-            mic_code = "XNGS"
-        if not exchange:
-            exchange = "NASDAQ"
-        if not currency:
-            currency = "USD"
 
-    # no more need for sleep of 8 seconds and calculations. Simply invoke "next(key_switcher)" to get the
-    # delay calculated automatically
     if not start_date:
         earliest_timestamp = get_earliest_timestamp_(
             symbol, time_interval=time_interval, mic_code=mic_code, api_key_pair=next(key_switcher))
@@ -254,10 +245,8 @@ def download_market_ticker_history_(
 
     full_time_series = []
     if isinstance(earliest_timestamp, dict):
-        # print("target timestamp", earliest_timestamp['datetime'], work_period_start)
         first_historical_point = datetime.strptime(earliest_timestamp['datetime'], date_string)
     elif isinstance(earliest_timestamp, datetime):
-        # print("target timestamp", earliest_timestamp, work_period_start)
         first_historical_point = earliest_timestamp
     else:
         TypeError('earliest timestamp has wrong type, possible types are (datetime, dict[\'datetime\'][str])')
@@ -304,8 +293,6 @@ def download_market_ticker_history_(
         elif time_interval == "1day":
             conversion_string = '%Y-%m-%d'
         new_latest_time_period = datetime.strptime(last_record['datetime'], conversion_string)
-        # if starting_record:
-        #     end_period = dat
         full_time_series.extend(partial_data['values'][1:])
 
         if verbose:
@@ -314,16 +301,13 @@ def download_market_ticker_history_(
 
         # check ending condition - data is downloaded backwards in time
         if new_latest_time_period == first_historical_point or len(partial_data['values']) < 4999:
-            # print(len(partial_data['values']) < 4999)
-            # print('end of download reached')
             break
-
-        # print(f'next dump up until following date: {new_latest_time_period}')
 
         # params refresh after recent download
         download_params = {
             "symbol": symbol,
             "time_interval": time_interval,
+            "mic_code": mic_code,
             "exchange": exchange,
             "currency": currency,
             "end_date": new_latest_time_period,
@@ -331,6 +315,5 @@ def download_market_ticker_history_(
         if start_date:
             download_params['start_date'] = start_date
 
-    # print(len(full_time_series))
     return full_time_series
 

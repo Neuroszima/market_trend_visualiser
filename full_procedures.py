@@ -4,7 +4,6 @@ from warnings import warn
 
 import api_functions
 import db_functions
-from minor_modules import time_interval_sanitizer
 
 
 def exotic_markets_warning():
@@ -12,9 +11,9 @@ def exotic_markets_warning():
          "I.e. I do not know how the function will perform for symbols from exotic markets (like Indonesia)")
 
 
-@time_interval_sanitizer()
 def time_series_save(
-        symbol: str, market_identification_code: str, time_interval: str, key_switcher: Generator, verbose=False):
+        symbol: str, market_identification_code: str | None,
+        time_interval: str, key_switcher: Generator, verbose=False):
     """
     automates entire process of downloading the data and then saving it directly into database from source
     """
@@ -47,7 +46,6 @@ def time_series_save(
         )
 
 
-@time_interval_sanitizer()
 def time_series_update(
         symbol: str, market_identification_code: str, time_interval: str, key_switcher: Generator,
         verbose: bool = False, end_date: datetime | None = None):
