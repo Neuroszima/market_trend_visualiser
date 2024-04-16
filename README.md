@@ -85,6 +85,8 @@ populated with a couple preselected stocks (kind of like "demo mode")
 :heavy_check_mark: prepare simple data visualizer for already downloaded timeseries 
 (limited one - latest 90 days or latest 90 minutes)
 
+#### proposals for future improvements and other ideas
+
 :heavy_minus_sign: prepare a visual tool (very basic, for example in T-kinter) to mark which tickers have to be 
 kept track of automatically when running script
 
@@ -92,3 +94,17 @@ kept track of automatically when running script
 computer (for example a script that you can run through Windows/Linux scheduler)
 
 :heavy_minus_sign: track how many tokens have been used so far in a day on a given key
+
+## Examples of charts made with the package
+
+[AAPL retro chart](./image_examples/AAPL_square_90s.png)
+
+[UWMC freedom24 chart](./image_examples/UWMC_square_freedom.png)
+
+[NVDA tradingview chart](./image_examples/NVDA_square_tradingview.png)
+
+all examples reside in ```image_examples``` folder in this repository
+
+If any visuals do not correspond to the quality presented in the examples, for example labels being clipped, you 
+can either switch the charting package from this one to different one, or message me by e-mail. We will try to 
+figure something out.
